@@ -1,0 +1,1090 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import sys
+import os
+import json
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from simulatore_produzione_agricola import (
+    configurazione_default,
+    genera_quantita_casuali,
+    simulazione_completa,
+    genera_report_produzione,
+    esporta_report_json,
+    imposta_tempo_per_unita,
+    imposta_capacita_giornaliera_prodotto,
+    imposta_capacita_complessiva,
+    imposta_orario_lavoro,
+    imposta_margine_temporale,
+    salva_configurazione,
+    carica_configurazione,
+    ReportSimulazione,
+)
+
+
+FONT_LABEL = ("Tahoma", 9, "bold")
+FONT_VALORE = ("Consolas", 10, "bold")
+FONT_BOTTONE = ("Tahoma", 9, "bold")
+FONT_TITOLO = ("Tahoma", 18, "bold")
+FONT_SOTTOTITOLO = ("Tahoma", 10, "bold")
+FONT_HEADING = ("Tahoma", 9, "bold")
+FONT_CALCOLO = ("Consolas", 10)
+FONT_HEAD_TABELLA = ("Tahoma", 9, "bold")
+FONT_TAB = ("Tahoma", 10, "bold")
+
+
+TEMI_OFFICINA = {
+    "classico": {
+        "meta": {"nome": "Officina Classico", "icona": "🔧"},
+        "cornice_esterna": "#8a8478",
+        "cornice_spessore_px": 6,
+        "sfondo_applicativo": "#e8e4dc",
+        "card_sfondo": "#faf8f2",
+        "card_bordo": "#8a8478",
+        "card_spessore_bordo": 2,
+        "header_sfondo": "#eaf5ec",
+        "header_bordo": "#8a8478",
+        "label_sfondo": "#8a8478",
+        "label_testo": "#ffffff",
+        "label_padding_x": 8,
+        "label_padding_y": 3,
+        "input_sfondo": "#f8f6f0",
+        "input_testo": "#1a1a1a",
+        "input_bordo": "#8a8478",
+        "input_spessore": 1,
+        "valore_sfondo": "#ffffff",
+        "valore_testo": "#0f4b8a",
+        "valore_bordo": "#8a8478",
+        "verde_primario": "#1c6b2c",
+        "verde_testo": "#ffffff",
+        "verde_hover": "#154d22",
+        "pulsante_secondario_sfondo": "#eae7dc",
+        "pulsante_secondario_testo": "#1a1a1a",
+        "pulsante_secondario_bordo": "#8a8478",
+        "rosso_kpi": "#9e1a1a",
+        "verde_kpi": "#126f25",
+        "blu_kpi": "#0f4b8a",
+        "tab_sfondo": "#e0ddd4",
+        "tab_testo": "#1a1a1a",
+        "tab_attivo_sfondo": "#faf8f2",
+        "tab_attivo_testo": "#1a1a1a",
+        "tab_bordo": "#8a8478",
+        "tree_sfondo": "#fcfaf4",
+        "tree_alt": "#efece2",
+        "tree_testo": "#1a1a1a",
+        "tree_head_sfondo": "#1c6b2c",
+        "tree_head_testo": "#ffffff",
+        "tree_sel_sfondo": "#9bc7a6",
+        "tree_sel_testo": "#1a1a1a",
+        "tree_bordo": "#8a8478",
+        "report_sfondo": "#fcfaf4",
+        "report_testo": "#1a1a1a",
+        "note_sfondo": "#e0ddd4",
+        "note_testo": "#1a1a1a",
+        "status_sfondo": "#d4d0c4",
+        "status_testo": "#1a1a1a",
+        "cornice_soft": "#8a8478",
+        "barra_titolo": "#6c665a",
+        "separatore": "#8a8478",
+    },
+}
+
+
+class SimulatoreAgricolturaGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("SIMULATORE PRODUZIONE AGRICOLA — GESTIONALE OFFICINA v3.1")
+        self.root.geometry("1280x880")
+        self.root.minsize(1120, 760)
+
+        self.cartella = os.path.dirname(os.path.abspath(__file__))
+        self.tema_corrente = "classico"
+
+        self.cfg = configurazione_default()
+        self.quantita_correnti: dict = {}
+        self.report_corrente: ReportSimulazione | None = None
+
+        self.lista_label_officina: list[tk.Label] = []
+        self.lista_valore_officina: list[tk.Label] = []
+        self.lista_input_officina: list[tk.Entry] = []
+        self.lista_bottoni: list[tk.Button] = []
+        self.lista_card: list[tk.Frame] = []
+        self.lista_tree: list[tk.Widget] = []
+        self.lista_text: list[tk.Text] = []
+        self.lista_note: list[tk.Label] = []
+        self.mappa_kpi: dict[str, tk.Label] = {}
+        self.header_frame: tk.Frame | None = None
+        self.status_frame: tk.Frame | None = None
+        self.outer_frame: tk.Frame | None = None
+        self.inner_frame: tk.Frame | None = None
+        self.notebook_outer: tk.Frame | None = None
+
+        self._layout_base()
+        self._costruisci()
+        self.applica_tema(self.tema_corrente)
+
+    # --------------------- Layout base cornice nera ---------------------
+    def _layout_base(self):
+        t = TEMI_OFFICINA[self.tema_corrente]
+        self.outer_frame = tk.Frame(self.root, bg=t["cornice_esterna"])
+        self.outer_frame.pack(fill="both", expand=True, padx=t["cornice_spessore_px"], pady=t["cornice_spessore_px"])
+        self.inner_frame = tk.Frame(self.outer_frame, bg=t["sfondo_applicativo"])
+        self.inner_frame.pack(fill="both", expand=True, padx=3, pady=3)
+
+    def _etichetta(self, parent, testo: str) -> tk.Label:
+        t = TEMI_OFFICINA[self.tema_corrente]
+        lab = tk.Label(
+            parent,
+            text=testo,
+            bg=t["label_sfondo"],
+            fg=t["label_testo"],
+            font=FONT_LABEL,
+            anchor="w",
+            padx=t["label_padding_x"],
+            pady=t["label_padding_y"],
+            bd=0,
+            highlightthickness=0,
+        )
+        self.lista_label_officina.append(lab)
+        return lab
+
+    def _valore(self, parent, testo_iniziale: str = "—") -> tk.Label:
+        t = TEMI_OFFICINA[self.tema_corrente]
+        lab = tk.Label(
+            parent,
+            text=testo_iniziale,
+            bg=t["valore_sfondo"],
+            fg=t["valore_testo"],
+            font=FONT_VALORE,
+            anchor="w",
+            justify="left",
+            padx=8,
+            pady=4,
+            bd=1,
+            relief="solid",
+            highlightbackground=t["valore_bordo"],
+            highlightthickness=1,
+            highlightcolor=t["valore_bordo"],
+        )
+        self.lista_valore_officina.append(lab)
+        return lab
+
+    def _input(self, parent, variabile: tk.Variable, width: int = 18) -> tk.Entry:
+        t = TEMI_OFFICINA[self.tema_corrente]
+        entry = tk.Entry(
+            parent,
+            textvariable=variabile,
+            width=width,
+            bg=t["input_sfondo"],
+            fg=t["input_testo"],
+            insertbackground=t["input_testo"],
+            font=("Consolas", 10, "bold"),
+            bd=0,
+            relief="flat",
+            highlightbackground=t["input_bordo"],
+            highlightthickness=2,
+            highlightcolor=t["input_bordo"],
+            selectbackground=t["input_sfondo"],
+            selectforeground=t["input_testo"],
+            justify="left",
+        )
+        self.lista_input_officina.append(entry)
+        return entry
+
+    def _bottone_verde(self, parent, testo: str, cmd) -> tk.Button:
+        t = TEMI_OFFICINA[self.tema_corrente]
+        btn = tk.Button(
+            parent,
+            text=testo,
+            command=cmd,
+            bg=t["verde_primario"],
+            fg=t["verde_testo"],
+            activebackground=t["verde_hover"],
+            activeforeground=t["verde_testo"],
+            font=FONT_BOTTONE,
+            bd=0,
+            relief="flat",
+            padx=12,
+            pady=7,
+            cursor="hand2",
+            highlightthickness=2,
+            highlightbackground=t["cornice_soft"],
+            highlightcolor=t["cornice_soft"],
+        )
+        self.lista_bottoni.append(btn)
+        return btn
+
+    def _bottone_secondario(self, parent, testo: str, cmd) -> tk.Button:
+        t = TEMI_OFFICINA[self.tema_corrente]
+        btn = tk.Button(
+            parent,
+            text=testo,
+            command=cmd,
+            bg=t["pulsante_secondario_sfondo"],
+            fg=t["pulsante_secondario_testo"],
+            activebackground=t["card_sfondo"],
+            activeforeground=t["pulsante_secondario_testo"],
+            font=FONT_BOTTONE,
+            bd=0,
+            relief="flat",
+            padx=10,
+            pady=6,
+            cursor="hand2",
+            highlightthickness=2,
+            highlightbackground=t["pulsante_secondario_bordo"],
+            highlightcolor=t["pulsante_secondario_bordo"],
+        )
+        self.lista_bottoni.append(btn)
+        return btn
+
+    def _card(self, parent, titolo: str = "", fill: str = "both", expand: bool = True, side: str = "top", padx=0, pady=0) -> tk.Frame:
+        t = TEMI_OFFICINA[self.tema_corrente]
+        outer = tk.Frame(parent, bg=t["cornice_soft"], bd=0, highlightthickness=1, highlightbackground=t["cornice_soft"])
+        outer.pack(fill=fill, expand=expand, side=side, padx=padx, pady=pady)
+        inner = tk.Frame(outer, bg=t["card_sfondo"], bd=0, highlightthickness=1, highlightbackground=t["card_bordo"])
+        inner.pack(fill="both", expand=True, padx=t["card_spessore_bordo"], pady=t["card_spessore_bordo"])
+        if titolo:
+            top = tk.Frame(inner, bg=t["barra_titolo"], height=28)
+            top.pack(fill="x", side="top")
+            tk.Label(
+                top, text="  " + titolo,
+                bg=t["barra_titolo"], fg="#ffffff",
+                font=FONT_HEADING, anchor="w",
+                padx=6, pady=4,
+            ).pack(fill="x")
+        self.lista_card.append(inner)
+        self.lista_card.append(outer)
+        return inner
+
+    # --------------------- Costruzione GUI ---------------------
+    def _costruisci(self):
+        self._build_header()
+        self._build_notebook_style()
+        self._build_tab_region()
+        self._build_status()
+
+    def _build_header(self):
+        t = TEMI_OFFICINA[self.tema_corrente]
+        wrap = tk.Frame(self.inner_frame, bg=t["cornice_soft"], bd=0, highlightthickness=2, highlightbackground=t["header_bordo"])
+        wrap.pack(fill="x", side="top", padx=10, pady=(10, 6))
+
+        self.header_frame = tk.Frame(wrap, bg=t["header_sfondo"], bd=0)
+        self.header_frame.pack(fill="x", padx=2, pady=2)
+
+        left = tk.Frame(self.header_frame, bg=t["header_sfondo"])
+        left.pack(side="left", fill="both", expand=True, padx=14, pady=10)
+
+        tk.Label(
+            left,
+            text="🌵  SIMULATORE PRODUZIONE AGRICOLA BIOLOGICA",
+            bg=t["header_sfondo"],
+            fg="#154d22",
+            font=FONT_TITOLO,
+            anchor="w",
+        ).pack(anchor="w")
+        tk.Label(
+            left,
+            text="  Azienda Agricola Terra Verde",
+            bg=t["header_sfondo"],
+            fg="#2c3e50",
+            font=FONT_SOTTOTITOLO,
+            anchor="w",
+        ).pack(anchor="w", pady=(3, 0))
+
+
+
+    def _build_notebook_style(self):
+        t = TEMI_OFFICINA[self.tema_corrente]
+        s = ttk.Style()
+        try:
+            s.theme_use("clam")
+        except Exception:
+            pass
+        s.configure(
+            "Officina.TNotebook",
+            background=t["sfondo_applicativo"],
+            borderwidth=0,
+            tabmargins=(4, 4, 4, 0),
+        )
+        s.configure(
+            "Officina.TNotebook.Tab",
+            background=t["tab_sfondo"],
+            foreground=t["tab_testo"],
+            font=FONT_TAB,
+            padding=(18, 9),
+            borderwidth=0,
+        )
+        s.map(
+            "Officina.TNotebook.Tab",
+            background=[("selected", t["tab_attivo_sfondo"])],
+            foreground=[("selected", t["tab_attivo_testo"])],
+        )
+        s.configure(
+            "Officina.Treeview",
+            background=t["tree_sfondo"],
+            foreground=t["tree_testo"],
+            fieldbackground=t["tree_sfondo"],
+            rowheight=26,
+            font=("Tahoma", 9),
+            borderwidth=1,
+            relief="solid",
+        )
+        s.configure(
+            "Officina.Treeview.Heading",
+            background=t["tree_head_sfondo"],
+            foreground=t["tree_head_testo"],
+            font=FONT_HEAD_TABELLA,
+            relief="flat",
+            padding=6,
+            borderwidth=1,
+        )
+        s.map(
+            "Officina.Treeview",
+            background=[("selected", t["tree_sel_sfondo"])],
+            foreground=[("selected", t["tree_sel_testo"])],
+        )
+        s.configure(
+            "Officina.Vertical.TScrollbar",
+            background=t["pulsante_secondario_sfondo"],
+            troughcolor=t["card_sfondo"],
+            bordercolor=t["card_bordo"],
+            arrowcolor=t["pulsante_secondario_testo"],
+            relief="flat",
+            gripcount=0,
+        )
+
+    def _build_tab_region(self):
+        self.notebook_outer = tk.Frame(self.inner_frame, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        self.notebook_outer.pack(fill="both", expand=True, padx=10, pady=(2, 6))
+        self.nb = ttk.Notebook(self.notebook_outer, style="Officina.TNotebook")
+        self.nb.pack(fill="both", expand=True)
+
+        f_cfg = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        f_prod = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        f_sim = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        f_rep = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        self.nb.add(f_cfg, text="  ⚙  CONFIGURAZIONE  ")
+        self.nb.add(f_prod, text="  🌱  PRODOTTI & QUANTITA  ")
+        self.nb.add(f_sim, text="  ▶  SIMULAZIONE  ")
+        self.nb.add(f_rep, text="  📊  REPORT & ANALISI  ")
+
+        self._tab_configurazione(f_cfg)
+        self._tab_prodotti(f_prod)
+        self._tab_simulazione(f_sim)
+        self._tab_report(f_rep)
+
+    # --------------- Tab 1: Configurazione ---------------
+    def _tab_configurazione(self, root_frm: tk.Frame):
+        sx = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        sx.pack(side="left", fill="both", expand=True, padx=(6, 8), pady=10)
+        dx = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        dx.pack(side="right", fill="both", expand=True, padx=(8, 6), pady=10)
+
+        card_p = self._card(sx, "PARAMETRI DI PROCESSO", fill="both", expand=True, pady=(0, 8))
+        griglia = tk.Frame(card_p, bg=card_p.cget("bg"))
+        griglia.pack(fill="x", padx=14, pady=14)
+
+        self.v_ore = tk.DoubleVar()
+        self.v_gg = tk.IntVar()
+        self.v_cap = tk.StringVar()
+        self.v_marg = tk.DoubleVar()
+        self.v_guasti = tk.DoubleVar()
+        self.v_cf = tk.DoubleVar()
+        self.v_op = tk.IntVar()
+
+        righe = [
+            ("Orario giornaliero (h):", self.v_ore),
+            ("Giorni lavorativi / settimana:", self.v_gg),
+            ("Capacità complessiva/giorno (0=illimitata):", self.v_cap),
+            ("Margine temporale (%):", self.v_marg),
+            ("Tasso guasti giornaliero (0..1):", self.v_guasti),
+            ("Costo fisso giornaliero (€):", self.v_cf),
+            ("N° operatori (scheduling parallelo):", self.v_op),
+        ]
+        for i, (lab, var) in enumerate(righe):
+            self._etichetta(griglia, lab).grid(row=i, column=0, sticky="we", pady=5, padx=(0, 10))
+            self._input(griglia, var, width=22).grid(row=i, column=1, sticky="we", pady=5)
+        griglia.columnconfigure(1, weight=1)
+
+        sep = tk.Frame(card_p, height=2, bg=TEMI_OFFICINA[self.tema_corrente]["separatore"])
+        sep.pack(fill="x", padx=14)
+        self._bottone_verde(card_p, "✅  APPLICA CONFIGURAZIONE", self._applica_config).pack(fill="x", padx=14, pady=12)
+
+        card_pers = self._card(sx, "PERSISTENZA CONFIGURAZIONE", fill="x", expand=False, pady=(8, 0))
+        self._bottone_secondario(card_pers, "💾  SALVA CONFIGURAZIONE JSON", self._salva_cfg).pack(fill="x", padx=14, pady=(14, 5))
+        self._bottone_secondario(card_pers, "📂  CARICA CONFIGURAZIONE JSON", self._carica_cfg).pack(fill="x", padx=14, pady=5)
+        self._bottone_secondario(card_pers, "↺  RIPRISTINA VALORI DI DEFAULT", self._ripristina_default).pack(fill="x", padx=14, pady=(5, 14))
+
+        card_kpi = self._card(dx, "QUICK KPI  —  ULTIMI RISULTATI", fill="both", expand=True, pady=(0, 8))
+        kpi_defs = [
+            ("Regime:", "regime", "blue"),
+            ("Tempo sequenziale:", "t_seq_g", "blue"),
+            ("Tempo parallelo:", "t_par_g", "blue"),
+            ("Speedup parallelismo:", "speedup", "green"),
+            ("Costo complessivo:", "costo", "red"),
+            ("Ricavo complessivo:", "ricavo", "green"),
+            ("Profitto complessivo:", "profitto", "green"),
+            ("Margine:", "margine_pct", "green"),
+            ("Sequenza ottimale lotti:", "ordine", "blue"),
+        ]
+        kpi_body = tk.Frame(card_kpi, bg=card_kpi.cget("bg"))
+        kpi_body.pack(fill="both", expand=True, padx=12, pady=12)
+        for i, (lab, k, color) in enumerate(kpi_defs):
+            self._etichetta(kpi_body, lab).grid(row=i, column=0, sticky="we", padx=(0, 10), pady=4)
+            v = self._valore(kpi_body, "—")
+            v.grid(row=i, column=1, sticky="we", pady=4)
+            kpi_body.columnconfigure(1, weight=1)
+            self.mappa_kpi[k] = v
+
+        sep2 = tk.Frame(dx, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"], height=8)
+        sep2.pack(fill="x")
+        card_note = self._card(dx, "INFORMAZIONI DI SISTEMA", fill="x", expand=False, pady=(8, 0))
+        nt = tk.Label(
+            card_note,
+            text="  Suggerimento: con 3 prodotti l'ottimizzazione sequenza\n"
+                 "  calcola in modo esaustivo 6 permutazioni per minimizzare\n"
+                 "  il makespan (tempo totale sequenziale) del lotto.",
+            bg=TEMI_OFFICINA[self.tema_corrente]["note_sfondo"],
+            fg=TEMI_OFFICINA[self.tema_corrente]["note_testo"],
+            font=("Tahoma", 9),
+            anchor="w",
+            justify="left",
+            padx=10, pady=10,
+            relief="solid",
+            bd=1,
+            highlightthickness=1,
+            highlightbackground=TEMI_OFFICINA[self.tema_corrente]["cornice_soft"],
+        )
+        nt.pack(fill="x", padx=12, pady=12)
+        self.lista_note.append(nt)
+
+    # --------------- Tab 2: Prodotti ---------------
+    def _tab_prodotti(self, root_frm: tk.Frame):
+        alto = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        alto.pack(fill="x", padx=10, pady=(10, 4))
+        basso = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        basso.pack(fill="both", expand=True, padx=10, pady=(4, 10))
+
+        card_tab = self._card(basso, "TABELLA PRODOTTI  —  doppio click per modificare", fill="both", expand=True)
+        body_tab = tk.Frame(card_tab, bg=card_tab.cget("bg"))
+        body_tab.pack(fill="both", expand=True, padx=10, pady=10)
+
+        cols = ("id", "nome", "um", "t_unita_h", "cap_gg", "t_prep", "t_lav", "resa_pct",
+                "t_sigma", "resa_sigma", "c_mano_ora", "c_mac_ora", "prezzo_um", "qta")
+        self.tab = ttk.Treeview(body_tab, columns=cols, show="headings", style="Officina.Treeview", height=11)
+        self.lista_tree.append(self.tab)
+        head = [
+            ("id", "ID", 60), ("nome", "Prodotto", 185), ("um", "U.M.", 55),
+            ("t_unita_h", "T unità (h)", 95), ("cap_gg", "Cap/gg", 75),
+            ("t_prep", "T prep", 85), ("t_lav", "T lav", 85),
+            ("resa_pct", "Resa %", 70), ("t_sigma", "T σ", 62), ("resa_sigma", "Resa σ", 70),
+            ("c_mano_ora", "€ mano/h", 82), ("c_mac_ora", "€ mac/h", 82),
+            ("prezzo_um", "€ vend/um", 90), ("qta", "Q.tà da produrre", 155),
+        ]
+        for c, tx, w in head:
+            self.tab.heading(c, text=tx)
+            self.tab.column(c, width=w, anchor="center")
+        self.tab.pack(side="left", fill="both", expand=True)
+        scr = ttk.Scrollbar(body_tab, orient="vertical", command=self.tab.yview, style="Officina.Vertical.TScrollbar")
+        scr.pack(side="right", fill="y")
+        self.tab.configure(yscrollcommand=scr.set)
+        self.tab.bind("<Double-1>", lambda _e: self._modifica())
+
+        card_toolbar = self._card(alto, "BARRA STRUMENTI PRODOTTI", fill="x", expand=False)
+        tb = tk.Frame(card_toolbar, bg=card_toolbar.cget("bg"))
+        tb.pack(fill="x", padx=12, pady=10)
+        self._bottone_verde(tb, "🎲  GENERA QUANTITA CASUALI", self._genera_qta).pack(side="left", padx=(0, 8))
+        self._bottone_secondario(tb, "✏  MODIFICA PRODOTTO SELEZIONATO", self._modifica).pack(side="left", padx=(0, 18))
+        self._etichetta(tb, "Seed:").pack(side="left", padx=(0, 8))
+        self.v_seed = tk.StringVar(value="42")
+        self._input(tb, self.v_seed, width=10).pack(side="left")
+
+    # --------------- Tab 3: Simulazione ---------------
+    def _tab_simulazione(self, root_frm: tk.Frame):
+        sx_f = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        sx_f.pack(side="left", fill="y", expand=False, padx=(10, 8), pady=10)
+        dx_f = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        dx_f.pack(side="right", fill="both", expand=True, padx=(8, 10), pady=10)
+
+        sx_card = self._card(sx_f, "PANNELLO ESECUZIONE", fill="both", expand=True, pady=(0, 8))
+        body = tk.Frame(sx_card, bg=sx_card.cget("bg"))
+        body.pack(fill="y", expand=False, padx=12, pady=12)
+
+        self.v_mc = tk.BooleanVar(value=True)
+        self.v_it = tk.IntVar(value=500)
+        self.v_seed_run = tk.StringVar(value="7")
+
+        t = TEMI_OFFICINA[self.tema_corrente]
+        mc_check = tk.Checkbutton(
+            body,
+            text="  ☑  ABILITA MONTE CARLO (stocasticità)",
+            variable=self.v_mc,
+            bg=t["card_sfondo"],
+            fg=t["pulsante_secondario_testo"],
+            activebackground=t["card_sfondo"],
+            selectcolor=t["input_sfondo"],
+            font=FONT_LABEL,
+            bd=0,
+            anchor="w",
+            highlightthickness=0,
+            cursor="hand2",
+        )
+        mc_check.pack(fill="x", pady=6)
+
+        self._etichetta(body, "Iterazioni Monte Carlo:").pack(fill="x", pady=(10, 3))
+        self._input(body, self.v_it, width=14).pack(fill="x")
+        self._etichetta(body, "Seed run (vuoto = casuale):").pack(fill="x", pady=(12, 3))
+        self._input(body, self.v_seed_run, width=18).pack(fill="x")
+
+        sep = tk.Frame(body, height=2, bg=t["separatore"])
+        sep.pack(fill="x", pady=18)
+
+        self._bottone_verde(body, "▶  ESEGUI SIMULAZIONE COMPLETA", self._esegui).pack(fill="x", pady=(0, 8))
+        self._bottone_secondario(body, "💾  ESPORTA REPORT JSON", self._esporta_json).pack(fill="x", pady=4)
+        self._bottone_secondario(body, "🧹  PULISCI OUTPUT", lambda: self.txt_out.delete("1.0", "end")).pack(fill="x", pady=4)
+
+        card_note2 = self._card(sx_f, "NOTE SULLE PRESTAZIONI", fill="x", expand=False, pady=(8, 0))
+        nt2 = tk.Label(
+            card_note2,
+            text="  • MC 500 iterazioni = ~1-2 secondi\n"
+                 "  • MC disabilitato = calcolo deterministico\n"
+                 "  • Sequenza lotti ottimizzata (esaustiva ≤ 8 prod.)",
+            bg=TEMI_OFFICINA[self.tema_corrente]["note_sfondo"],
+            fg=TEMI_OFFICINA[self.tema_corrente]["note_testo"],
+            font=("Tahoma", 9),
+            anchor="w",
+            justify="left",
+            padx=10, pady=10,
+            relief="solid", bd=1,
+            highlightbackground=t["cornice_soft"], highlightthickness=1,
+        )
+        nt2.pack(fill="x", padx=12, pady=12)
+        self.lista_note.append(nt2)
+
+        dx_card = self._card(dx_f, "OUTPUT TESTUALE SIMULAZIONE", fill="both", expand=True)
+        dx_body = tk.Frame(dx_card, bg=dx_card.cget("bg"))
+        dx_body.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.txt_out = tk.Text(
+            dx_body, wrap="none", font=FONT_CALCOLO,
+            padx=12, pady=10, height=10, bd=0, relief="flat",
+            highlightthickness=2, highlightbackground=TEMI_OFFICINA[self.tema_corrente]["cornice_soft"],
+        )
+        self.lista_text.append(self.txt_out)
+        self.txt_out.pack(side="left", fill="both", expand=True)
+        scr2 = ttk.Scrollbar(dx_body, orient="vertical", command=self.txt_out.yview, style="Officina.Vertical.TScrollbar")
+        scr2.pack(side="right", fill="y")
+        self.txt_out.configure(yscrollcommand=scr2.set)
+
+    # --------------- Tab 4: Report ---------------
+    def _tab_report(self, root_frm: tk.Frame):
+        alto = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        alto.pack(fill="both", expand=True, padx=10, pady=(10, 4))
+        basso = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        basso.pack(fill="x", expand=False, padx=10, pady=(4, 10))
+
+        card_rep = self._card(alto, "TABELLA DETTAGLIO LOTTI", fill="both", expand=True)
+        body_rep = tk.Frame(card_rep, bg=card_rep.cget("bg"))
+        body_rep.pack(fill="both", expand=True, padx=10, pady=10)
+
+        cols = ("lotto", "id", "qta_in", "t_prep_h", "t_racc_h", "t_lav_h", "t_guasti_h",
+                "t_tot_h", "t_tot_g", "resa_eff", "out_f", "costo_tot", "ricavo", "profitto")
+        self.tab_report = ttk.Treeview(body_rep, columns=cols, show="headings", style="Officina.Treeview", height=14)
+        self.lista_tree.append(self.tab_report)
+        h = [
+            ("lotto", "Lotto", 58), ("id", "ID", 92), ("qta_in", "Qta in", 80),
+            ("t_prep_h", "T prep", 74), ("t_racc_h", "T racc", 74), ("t_lav_h", "T lav", 74), ("t_guasti_h", "T guasti", 84),
+            ("t_tot_h", "T tot h", 86), ("t_tot_g", "T tot gg", 92), ("resa_eff", "Resa %", 72),
+            ("out_f", "Output fin.", 100), ("costo_tot", "Costo €", 96), ("ricavo", "Ricavo €", 100),
+            ("profitto", "Profitto €", 106),
+        ]
+        for c, tx, w in h:
+            self.tab_report.heading(c, text=tx)
+            self.tab_report.column(c, width=w, anchor="center")
+        self.tab_report.pack(side="left", fill="both", expand=True)
+        scr3 = ttk.Scrollbar(body_rep, orient="vertical", command=self.tab_report.yview, style="Officina.Vertical.TScrollbar")
+        scr3.pack(side="right", fill="y")
+        self.tab_report.configure(yscrollcommand=scr3.set)
+
+        card_g = self._card(basso, "DIAGRAMMA DI GANTT TESTUALE  —  SCHEDULING SEQUENZIALE", fill="x", expand=False)
+        body_g = tk.Frame(card_g, bg=card_g.cget("bg"))
+        body_g.pack(fill="x", expand=False, padx=10, pady=10)
+        self.txt_gantt = tk.Text(
+            body_g, height=7, wrap="none", font=FONT_CALCOLO,
+            padx=12, pady=10, bd=0, relief="flat",
+            highlightthickness=2, highlightbackground=TEMI_OFFICINA[self.tema_corrente]["cornice_soft"],
+        )
+        self.lista_text.append(self.txt_gantt)
+        self.txt_gantt.pack(fill="x", expand=False)
+
+    # --------------- Status bar ---------------
+    def _build_status(self):
+        t = TEMI_OFFICINA[self.tema_corrente]
+        wrap = tk.Frame(self.inner_frame, bg=t["cornice_soft"], bd=0, highlightthickness=1, highlightbackground=t["cornice_soft"])
+        wrap.pack(fill="x", side="bottom", padx=10, pady=(2, 10))
+        self.status_frame = tk.Frame(wrap, bg=t["status_sfondo"], bd=0)
+        self.status_frame.pack(fill="x", padx=2, pady=2)
+        self.status = tk.StringVar(value="PRONTO.  Configura parametri  →  Genera quantità  →  Esegui simulazione.")
+        lab = tk.Label(
+            self.status_frame, textvariable=self.status,
+            bg=t["status_sfondo"], fg=t["status_testo"],
+            font=("Consolas", 9), anchor="w", padx=14, pady=5,
+        )
+        lab.pack(side="left", fill="x", expand=True)
+        self.lista_note.append(lab)
+
+    # ---------------------- Tema applicazione runtime ----------------------
+    def applica_tema(self, nome_tema: str):
+        t = TEMI_OFFICINA[nome_tema]
+        self.tema_corrente = nome_tema
+
+        if self.outer_frame is not None:
+            self.outer_frame.configure(bg=t["cornice_esterna"])
+        if self.inner_frame is not None:
+            self.inner_frame.configure(bg=t["sfondo_applicativo"])
+        if self.header_frame is not None:
+            self.header_frame.configure(bg=t["header_sfondo"])
+            for child in self.header_frame.winfo_children():
+                try:
+                    if child.cget("bg") == "SystemButtonFace":
+                        child.configure(bg=t["header_sfondo"])
+                    else:
+                        child.configure(bg=t["header_sfondo"])
+                except Exception:
+                    pass
+
+        for lab in self.lista_label_officina:
+            lab.configure(bg=t["label_sfondo"], fg=t["label_testo"])
+        for v in self.lista_valore_officina:
+            v.configure(
+                bg=t["valore_sfondo"], fg=t["valore_testo"],
+                highlightbackground=t["valore_bordo"],
+                highlightcolor=t["valore_bordo"],
+            )
+        for entry in self.lista_input_officina:
+            entry.configure(
+                bg=t["input_sfondo"], fg=t["input_testo"],
+                insertbackground=t["input_testo"],
+                selectbackground=t["input_sfondo"],
+                selectforeground=t["input_testo"],
+                highlightbackground=t["input_bordo"],
+                highlightcolor=t["input_bordo"],
+            )
+        verde_ref = TEMI_OFFICINA["classico"]["verde_primario"]
+        for btn in self.lista_bottoni:
+            is_verde = False
+            try:
+                bg_attuale = btn.cget("bg")
+                if str(bg_attuale) in [str(verde_ref), "#1c6b2c"]:
+                    is_verde = True
+            except Exception:
+                pass
+            if is_verde:
+                btn.configure(
+                    bg=t["verde_primario"], fg=t["verde_testo"],
+                    activebackground=t["verde_hover"], activeforeground=t["verde_testo"],
+                )
+            else:
+                btn.configure(
+                    bg=t["pulsante_secondario_sfondo"], fg=t["pulsante_secondario_testo"],
+                    activebackground=t["card_sfondo"], activeforeground=t["pulsante_secondario_testo"],
+                    highlightbackground=t["pulsante_secondario_bordo"],
+                    highlightcolor=t["pulsante_secondario_bordo"],
+                )
+        for card in self.lista_card:
+            try:
+                card.configure(bg=t["card_sfondo"])
+            except Exception:
+                pass
+
+        for txt in self.lista_text:
+            txt.configure(
+                bg=t["report_sfondo"], fg=t["report_testo"],
+                insertbackground=t["report_testo"],
+                selectbackground=t["report_sfondo"],
+                selectforeground=t["report_testo"],
+                highlightbackground=t["cornice_soft"],
+            )
+
+        for note in self.lista_note:
+            try:
+                bg_n = note.cget("bg")
+            except Exception:
+                continue
+            try:
+                if "status" in str(note.master) or note.master is self.status_frame:
+                    note.configure(bg=t["status_sfondo"], fg=t["status_testo"])
+                else:
+                    note.configure(bg=t["note_sfondo"], fg=t["note_testo"])
+            except Exception:
+                try:
+                    note.configure(bg=t["note_sfondo"], fg=t["note_testo"])
+                except Exception:
+                    pass
+
+        self._build_notebook_style()
+
+        try:
+            s = ttk.Style()
+            s.configure(
+                "Officina.Treeview",
+                background=t["tree_sfondo"],
+                foreground=t["tree_testo"],
+                fieldbackground=t["tree_sfondo"],
+            )
+            s.configure(
+                "Officina.Treeview.Heading",
+                background=t["tree_head_sfondo"],
+                foreground=t["tree_head_testo"],
+            )
+            s.map(
+                "Officina.Treeview",
+                background=[("selected", t["tree_sel_sfondo"])],
+                foreground=[("selected", t["tree_sel_testo"])],
+            )
+            for tv in self.lista_tree:
+                try:
+                    tv.tag_configure("odd", background=t["tree_alt"])
+                    tv.tag_configure("even", background=t["tree_sfondo"])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    # ---------------------- Azioni ----------------------
+    def _carica_default(self):
+        self._aggiorna_campi_cfg()
+        self._popola_tabella()
+
+    def _aggiorna_campi_cfg(self):
+        c = self.cfg
+        self.v_ore.set(c.orario_lavoro_giornaliero_ore)
+        self.v_gg.set(c.giorni_lavorativi_settimana)
+        self.v_cap.set(c.capacita_giornaliera_complessiva_unita or 0)
+        self.v_marg.set(c.margine_temporale_percentuale)
+        self.v_guasti.set(c.tasso_guasti_giornaliero)
+        self.v_cf.set(c.costo_fisso_giornaliero)
+        self.v_op.set(c.numero_operatori)
+
+    def _popola_tabella(self):
+        for iid in self.tab.get_children():
+            self.tab.delete(iid)
+        t = TEMI_OFFICINA[self.tema_corrente]
+        for i, (key, p) in enumerate(self.cfg.prodotti_configurati.items()):
+            tag = "even" if i % 2 == 0 else "odd"
+            self.tab.insert("", "end", iid=key, tags=(tag,), values=(
+                key, p.nome, p.unita_misura, p.tempo_per_unita_ore, p.capacita_giornaliera,
+                p.fase_preparazione_ore, p.fase_lavorazione_ore, p.resa_percentuale,
+                p.tempo_unita_sigma, p.resa_sigma, p.costo_manodopera_ora, p.costo_macchinari_ora,
+                p.prezzo_vendita_per_unita_output, self.quantita_correnti.get(key, ""),
+            ))
+        self.tab.tag_configure("odd", background=t["tree_alt"])
+        self.tab.tag_configure("even", background=t["tree_sfondo"])
+
+    def _applica_config(self):
+        try:
+            ore = float(self.v_ore.get())
+            gg = int(self.v_gg.get())
+            imposta_orario_lavoro(self.cfg, ore, gg)
+
+            cap_raw = str(self.v_cap.get()).strip()
+            cap = int(cap_raw) if cap_raw else 0
+            imposta_capacita_complessiva(self.cfg, cap if cap > 0 else None)
+            imposta_margine_temporale(self.cfg, float(self.v_marg.get()))
+
+            guasti = float(self.v_guasti.get())
+            if not (0 <= guasti < 1):
+                raise ValueError("Tasso guasti in [0, 1)")
+            self.cfg.tasso_guasti_giornaliero = guasti
+            self.cfg.costo_fisso_giornaliero = max(0.0, float(self.v_cf.get()))
+            nop = int(self.v_op.get())
+            if nop <= 0:
+                raise ValueError("N° operatori non valido")
+            self.cfg.numero_operatori = nop
+
+            self._status("OK.  Configurazione generale applicata.")
+            messagebox.showinfo("OK", "Configurazione applicata con successo.")
+        except ValueError as e:
+            messagebox.showerror("Errore di input", str(e))
+
+    def _salva_cfg(self):
+        p = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")], initialfile="configurazione_agricola.json")
+        if p:
+            try:
+                salva_configurazione(self.cfg, p)
+                self._status(f"CONFIGURAZIONE SALVATA →  {p}")
+                messagebox.showinfo("OK", f"Configurazione salvata:\n{p}")
+            except OSError as e:
+                messagebox.showerror("Errore I/O", str(e))
+
+    def _carica_cfg(self):
+        p = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+        if p:
+            try:
+                self.cfg = carica_configurazione(p)
+                self._aggiorna_campi_cfg()
+                self._popola_tabella()
+                self._status(f"CONFIGURAZIONE CARICATA ←  {p}")
+                messagebox.showinfo("OK", "Configurazione caricata.")
+            except (OSError, TypeError) as e:
+                messagebox.showerror("Errore", str(e))
+
+    def _ripristina_default(self):
+        self.cfg = configurazione_default()
+        self.quantita_correnti.clear()
+        self._aggiorna_campi_cfg()
+        self._popola_tabella()
+        self._status("RIPRISTINATI VALORI DI DEFAULT.")
+
+    def _genera_qta(self):
+        s_raw = str(self.v_seed.get()).strip()
+        seed = int(s_raw) if s_raw.lstrip("-").isdigit() else None
+        self.quantita_correnti = genera_quantita_casuali(self.cfg, seed=seed)
+        for key, q in self.quantita_correnti.items():
+            if self.tab.exists(key):
+                v = list(self.tab.item(key, "values"))
+                v[-1] = q
+                self.tab.item(key, values=v)
+        self._status(f"QUANTITA GENERATE  (seed={seed}).")
+
+    def _modifica(self):
+        sel = self.tab.selection()
+        if not sel:
+            messagebox.showwarning("Selezione", "Seleziona un prodotto dalla tabella.")
+            return
+        key = sel[0]
+        p = self.cfg.prodotti_configurati[key]
+        vals = list(self.tab.item(key, "values"))
+        t = TEMI_OFFICINA[self.tema_corrente]
+
+        win = tk.Toplevel(self.root)
+        win.title(f"MODIFICA — {p.nome}")
+        win.geometry("520x660")
+        win.configure(bg=t["sfondo_applicativo"])
+        win.transient(self.root); win.grab_set()
+
+        wrap = tk.Frame(win, bg=t["cornice_soft"])
+        wrap.pack(fill="both", expand=True, padx=6, pady=6)
+        inner = tk.Frame(wrap, bg=t["card_sfondo"])
+        inner.pack(fill="both", expand=True, padx=2, pady=2)
+
+        head = tk.Frame(inner, bg=t["barra_titolo"], height=32)
+        head.pack(fill="x")
+        tk.Label(head, text="  🛠  SCHEDA MODIFICA PRODOTTO",
+                 bg=t["barra_titolo"], fg="#ffffff", font=FONT_HEADING, anchor="w").pack(fill="x", padx=4, pady=6)
+
+        body = tk.Frame(inner, bg=t["card_sfondo"])
+        body.pack(fill="both", expand=True, padx=18, pady=14)
+
+        campi = [
+            ("Nome (sola lettura):", p.nome, False, str),
+            ("Unità di misura:", p.unita_misura, False, str),
+            ("Tempo per unità [h]:", p.tempo_per_unita_ore, True, float),
+            ("Capacità giornaliera max:", p.capacita_giornaliera, True, int),
+            ("Fase preparazione [h]:", p.fase_preparazione_ore, True, float),
+            ("Fase lavorazione [h]:", p.fase_lavorazione_ore, True, float),
+            ("Resa percentuale [%]:", p.resa_percentuale, True, float),
+            ("Sigma tempo per unità:", p.tempo_unita_sigma, True, float),
+            ("Sigma resa percentuale:", p.resa_sigma, True, float),
+            ("Costo manodopera €/h:", p.costo_manodopera_ora, True, float),
+            ("Costo macchinari €/h:", p.costo_macchinari_ora, True, float),
+            ("Prezzo di vendita €/um:", p.prezzo_vendita_per_unita_output, True, float),
+            ("Quantità da produrre:", vals[-1] or 0, True, int),
+        ]
+        vars_w: list[tk.StringVar] = []
+        for i, (lab, val, editable, _tipo) in enumerate(campi):
+            self._etichetta(body, lab).grid(row=i, column=0, sticky="we", padx=(0, 12), pady=5)
+            v = tk.StringVar(value=str(val))
+            vars_w.append(v)
+            e = self._input(body, v, width=26)
+            e.grid(row=i, column=1, sticky="we", pady=5)
+            if not editable:
+                e.configure(state="readonly")
+        body.columnconfigure(1, weight=1)
+
+        def salva() -> None:
+            try:
+                _, _, _, tipi = list(zip(*campi))
+                tl = list(tipi)
+                imposta_tempo_per_unita(self.cfg, key, tl[2](vars_w[2].get()))
+                imposta_capacita_giornaliera_prodotto(self.cfg, key, tl[3](vars_w[3].get()))
+                p.fase_preparazione_ore = tl[4](vars_w[4].get())
+                p.fase_lavorazione_ore = tl[5](vars_w[5].get())
+                p.resa_percentuale = tl[6](vars_w[6].get())
+                p.tempo_unita_sigma = tl[7](vars_w[7].get())
+                p.resa_sigma = tl[8](vars_w[8].get())
+                p.costo_manodopera_ora = tl[9](vars_w[9].get())
+                p.costo_macchinari_ora = tl[10](vars_w[10].get())
+                p.prezzo_vendita_per_unita_output = tl[11](vars_w[11].get())
+                q = tl[12](vars_w[12].get())
+                if q < 0:
+                    raise ValueError("Quantità negativa non ammessa")
+                self.quantita_correnti[key] = q
+                self._popola_tabella()
+                win.destroy()
+                self._status(f"PRODOTTO AGGIORNATO: {key}.")
+            except ValueError as e:
+                messagebox.showerror("Valore non valido", str(e))
+
+        bb = tk.Frame(inner, bg=t["card_sfondo"])
+        bb.pack(pady=16)
+        self._bottone_secondario(bb, "ANNULLA", win.destroy).pack(side="left", padx=8)
+        self._bottone_verde(bb, "SALVA MODIFICHE", salva).pack(side="left", padx=8)
+
+    def _raccogli_qta(self) -> dict | None:
+        qta = {}
+        for key in self.cfg.prodotti_configurati:
+            vals = self.tab.item(key, "values")
+            try:
+                q = int(float(vals[-1])) if str(vals[-1]).strip() else 0
+            except (ValueError, TypeError):
+                q = 0
+            if q <= 0:
+                messagebox.showwarning("Quantità mancante",
+                                       f"Imposta una quantità > 0 per {self.cfg.prodotti_configurati[key].nome}")
+                return None
+            qta[key] = q
+        self.quantita_correnti = qta
+        return qta
+
+    def _esegui(self):
+        qta = self._raccogli_qta()
+        if qta is None:
+            return
+        s_raw = str(self.v_seed_run.get()).strip()
+        seed = int(s_raw) if s_raw.lstrip("-").isdigit() else None
+
+        mc_it = int(self.v_it.get()) if self.v_mc.get() else 0
+        if mc_it < 0:
+            messagebox.showerror("Errore", "Iterazioni MC non valide.")
+            return
+
+        self._status("CALCOLO IN CORSO... attendere.")
+        self.root.update_idletasks()
+
+        try:
+            rep = simulazione_completa(self.cfg, qta, seed=seed, mc_iterazioni=mc_it)
+        except Exception as e:
+            messagebox.showerror("Errore motore", str(e))
+            self._status("ERRORE nella simulazione.")
+            return
+
+        self.report_corrente = rep
+        out = genera_report_produzione(rep)
+        self.txt_out.delete("1.0", "end")
+        self.txt_out.insert("end", out)
+        self._aggiorna_kpi(rep)
+        self._aggiorna_report(rep)
+        self._aggiorna_gantt(rep)
+        self._status(
+            f"SIMULAZIONE COMPLETATA: {rep.regime.upper()}"
+            + (f" ({rep.monte_carlo_iterazioni} iterazioni MC).  " if rep.monte_carlo_iterazioni else ".  ")
+            + f"PROFITTO = € {rep.profitto_complessivo}"
+        )
+
+    def _aggiorna_kpi(self, r: ReportSimulazione):
+        speedup = 0.0
+        if r.tempo_totale_giorni_parallelo > 0:
+            speedup = r.tempo_totale_giorni_sequenziale / r.tempo_totale_giorni_parallelo
+        mpct = (r.profitto_complessivo / r.ricavo_complessivo * 100) if r.ricavo_complessivo > 0 else 0
+
+        vals = {
+            "regime": r.regime.upper() + (f" ({r.monte_carlo_iterazioni})" if r.monte_carlo_iterazioni else ""),
+            "t_seq_g": f"{r.tempo_totale_giorni_sequenziale} gg",
+            "t_par_g": f"{r.tempo_totale_giorni_parallelo} gg",
+            "speedup": f"{speedup:.2f}x",
+            "costo": f"€ {r.costo_complessivo}",
+            "ricavo": f"€ {r.ricavo_complessivo}",
+            "profitto": f"€ {r.profitto_complessivo}",
+            "margine_pct": f"{mpct:.2f} %",
+            "ordine": "   →   ".join(r.ordine_lotti_ottimale or []),
+        }
+        t = TEMI_OFFICINA[self.tema_corrente]
+        colori = {
+            "regime": t["blu_kpi"], "t_seq_g": t["blu_kpi"], "t_par_g": t["blu_kpi"], "ordine": t["blu_kpi"],
+            "speedup": t["verde_kpi"], "ricavo": t["verde_kpi"], "margine_pct": t["verde_kpi"],
+            "costo": t["rosso_kpi"],
+        }
+        for k, text in vals.items():
+            lab = self.mappa_kpi.get(k)
+            if lab is None:
+                continue
+            lab.configure(text=text)
+            if k == "profitto":
+                col = t["rosso_kpi"] if r.profitto_complessivo < 0 else t["verde_kpi"]
+            else:
+                col = colori.get(k, t["blu_kpi"])
+            lab.configure(fg=col)
+
+    def _aggiorna_report(self, r: ReportSimulazione):
+        for iid in self.tab_report.get_children():
+            self.tab_report.delete(iid)
+        t = TEMI_OFFICINA[self.tema_corrente]
+        for idx, l in enumerate(r.lotti, 1):
+            tag = "even" if idx % 2 == 0 else "odd"
+            self.tab_report.insert("", "end", tags=(tag,), values=(
+                idx, l.id_prodotto, l.quantita_input,
+                l.tempo_preparazione_ore, l.tempo_raccolta_ore, l.tempo_lavorazione_ore, l.tempo_guasti_ore,
+                l.tempo_totale_ore, l.tempo_totale_giorni_lavorativi, l.resa_effettiva_percentuale,
+                l.output_finale_unita, l.costo_totale, l.ricavo_atteso, l.profitto_atteso,
+            ))
+        self.tab_report.tag_configure("odd", background=t["tree_alt"])
+        self.tab_report.tag_configure("even", background=t["tree_sfondo"])
+
+    def _aggiorna_gantt(self, r: ReportSimulazione):
+        if not r.lotti:
+            return
+        fine_max = max((l.fine_giorno_relativo for l in r.lotti), default=1.0)
+        scale = 74.0
+        tot_units = max(int(round(fine_max * scale / max(fine_max, 0.001))), 2)
+        righe = []
+        righe.append("   LEGENDA:  [██] = fase attiva del lotto    ·    colonna sinistra = ID prodotto (inizio giorni  →  fine giorni)")
+        righe.append("")
+        mappa = {l.id_prodotto: l for l in r.lotti}
+        ordine = r.ordine_lotti_ottimale or list(mappa.keys())
+        for key in ordine:
+            l = mappa[key]
+            inizio = l.inizio_giorno_relativo
+            fine = l.fine_giorno_relativo
+            i_start = int(round((inizio / max(fine_max, 0.001)) * tot_units)) if fine_max > 0 else 0
+            i_end = int(round((fine / max(fine_max, 0.001)) * tot_units)) if fine_max > 0 else tot_units
+            i_end = max(i_start + 1, min(i_end, tot_units))
+            barra = [" "] * tot_units
+            for j in range(i_start, i_end):
+                barra[j] = "█"
+            righe.append(f"   {l.id_prodotto:<9}  [{''.join(barra)}]  {inizio:.2f} → {fine:.2f} gg")
+        self.txt_gantt.delete("1.0", "end")
+        self.txt_gantt.insert("end", "\n".join(righe))
+
+    def _esporta_json(self):
+        if self.report_corrente is None:
+            messagebox.showwarning("Nessun report", "Esegui prima la simulazione.")
+            return
+        p = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")], initialfile="report_produzione.json")
+        if p:
+            try:
+                esporta_report_json(self.report_corrente, p)
+                self._status(f"REPORT ESPORTATO →  {p}")
+                messagebox.showinfo("OK", f"Report esportato:\n{p}")
+            except OSError as e:
+                messagebox.showerror("Errore I/O", str(e))
+
+    def _status(self, m: str):
+        self.status.set("  " + m)
+
+
+def main() -> None:
+    root = tk.Tk()
+    try:
+        from ctypes import windll  # type: ignore
+        windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+    app = SimulatoreAgricolturaGUI(root)
+    app._carica_default()
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
