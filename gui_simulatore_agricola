@@ -34,9 +34,9 @@ FONT_HEAD_TABELLA = ("Tahoma", 9, "bold")
 FONT_TAB = ("Tahoma", 10, "bold")
 
 
-TEMI_OFFICINA = {
+TEMI_TERRA_VERDE = {
     "classico": {
-        "meta": {"nome": "Officina Classico", "icona": "🔧"},
+        "meta": {"nome": "Terra Verde Classico", "icona": "🌵"},
         "cornice_esterna": "#8a8478",
         "cornice_spessore_px": 6,
         "sfondo_applicativo": "#e8e4dc",
@@ -94,7 +94,7 @@ TEMI_OFFICINA = {
 class SimulatoreAgricolturaGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SIMULATORE PRODUZIONE AGRICOLA — GESTIONALE OFFICINA v3.1")
+        self.root.title("SIMULATORE PRODUZIONE AGRICOLA — TERRA VERDE")
         self.root.geometry("1280x880")
         self.root.minsize(1120, 760)
 
@@ -105,9 +105,9 @@ class SimulatoreAgricolturaGUI:
         self.quantita_correnti: dict = {}
         self.report_corrente: ReportSimulazione | None = None
 
-        self.lista_label_officina: list[tk.Label] = []
-        self.lista_valore_officina: list[tk.Label] = []
-        self.lista_input_officina: list[tk.Entry] = []
+        self.lista_label_terra_verde: list[tk.Label] = []
+        self.lista_valore_terra_verde: list[tk.Label] = []
+        self.lista_input_terra_verde: list[tk.Entry] = []
         self.lista_bottoni: list[tk.Button] = []
         self.lista_card: list[tk.Frame] = []
         self.lista_tree: list[tk.Widget] = []
@@ -126,14 +126,14 @@ class SimulatoreAgricolturaGUI:
 
     # --------------------- Layout base cornice nera ---------------------
     def _layout_base(self):
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         self.outer_frame = tk.Frame(self.root, bg=t["cornice_esterna"])
         self.outer_frame.pack(fill="both", expand=True, padx=t["cornice_spessore_px"], pady=t["cornice_spessore_px"])
         self.inner_frame = tk.Frame(self.outer_frame, bg=t["sfondo_applicativo"])
         self.inner_frame.pack(fill="both", expand=True, padx=3, pady=3)
 
     def _etichetta(self, parent, testo: str) -> tk.Label:
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         lab = tk.Label(
             parent,
             text=testo,
@@ -146,11 +146,11 @@ class SimulatoreAgricolturaGUI:
             bd=0,
             highlightthickness=0,
         )
-        self.lista_label_officina.append(lab)
+        self.lista_label_terra_verde.append(lab)
         return lab
 
     def _valore(self, parent, testo_iniziale: str = "—") -> tk.Label:
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         lab = tk.Label(
             parent,
             text=testo_iniziale,
@@ -167,11 +167,11 @@ class SimulatoreAgricolturaGUI:
             highlightthickness=1,
             highlightcolor=t["valore_bordo"],
         )
-        self.lista_valore_officina.append(lab)
+        self.lista_valore_terra_verde.append(lab)
         return lab
 
     def _input(self, parent, variabile: tk.Variable, width: int = 18) -> tk.Entry:
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         entry = tk.Entry(
             parent,
             textvariable=variabile,
@@ -189,11 +189,11 @@ class SimulatoreAgricolturaGUI:
             selectforeground=t["input_testo"],
             justify="left",
         )
-        self.lista_input_officina.append(entry)
+        self.lista_input_terra_verde.append(entry)
         return entry
 
     def _bottone_verde(self, parent, testo: str, cmd) -> tk.Button:
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         btn = tk.Button(
             parent,
             text=testo,
@@ -216,7 +216,7 @@ class SimulatoreAgricolturaGUI:
         return btn
 
     def _bottone_secondario(self, parent, testo: str, cmd) -> tk.Button:
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         btn = tk.Button(
             parent,
             text=testo,
@@ -239,7 +239,7 @@ class SimulatoreAgricolturaGUI:
         return btn
 
     def _card(self, parent, titolo: str = "", fill: str = "both", expand: bool = True, side: str = "top", padx=0, pady=0) -> tk.Frame:
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         outer = tk.Frame(parent, bg=t["cornice_soft"], bd=0, highlightthickness=1, highlightbackground=t["cornice_soft"])
         outer.pack(fill=fill, expand=expand, side=side, padx=padx, pady=pady)
         inner = tk.Frame(outer, bg=t["card_sfondo"], bd=0, highlightthickness=1, highlightbackground=t["card_bordo"])
@@ -265,7 +265,7 @@ class SimulatoreAgricolturaGUI:
         self._build_status()
 
     def _build_header(self):
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         wrap = tk.Frame(self.inner_frame, bg=t["cornice_soft"], bd=0, highlightthickness=2, highlightbackground=t["header_bordo"])
         wrap.pack(fill="x", side="top", padx=10, pady=(10, 6))
 
@@ -295,20 +295,20 @@ class SimulatoreAgricolturaGUI:
 
 
     def _build_notebook_style(self):
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         s = ttk.Style()
         try:
             s.theme_use("clam")
         except Exception:
             pass
         s.configure(
-            "Officina.TNotebook",
+            "Terra_Verde.TNotebook",
             background=t["sfondo_applicativo"],
             borderwidth=0,
             tabmargins=(4, 4, 4, 0),
         )
         s.configure(
-            "Officina.TNotebook.Tab",
+            "Terra_Verde.TNotebook.Tab",
             background=t["tab_sfondo"],
             foreground=t["tab_testo"],
             font=FONT_TAB,
@@ -316,12 +316,12 @@ class SimulatoreAgricolturaGUI:
             borderwidth=0,
         )
         s.map(
-            "Officina.TNotebook.Tab",
+            "Terra_Verde.TNotebook.Tab",
             background=[("selected", t["tab_attivo_sfondo"])],
             foreground=[("selected", t["tab_attivo_testo"])],
         )
         s.configure(
-            "Officina.Treeview",
+            "Terra_Verde.Treeview",
             background=t["tree_sfondo"],
             foreground=t["tree_testo"],
             fieldbackground=t["tree_sfondo"],
@@ -331,7 +331,7 @@ class SimulatoreAgricolturaGUI:
             relief="solid",
         )
         s.configure(
-            "Officina.Treeview.Heading",
+            "Terra_Verde.Treeview.Heading",
             background=t["tree_head_sfondo"],
             foreground=t["tree_head_testo"],
             font=FONT_HEAD_TABELLA,
@@ -340,12 +340,12 @@ class SimulatoreAgricolturaGUI:
             borderwidth=1,
         )
         s.map(
-            "Officina.Treeview",
+            "Terra_Verde.Treeview",
             background=[("selected", t["tree_sel_sfondo"])],
             foreground=[("selected", t["tree_sel_testo"])],
         )
         s.configure(
-            "Officina.Vertical.TScrollbar",
+            "Terra_Verde.Vertical.TScrollbar",
             background=t["pulsante_secondario_sfondo"],
             troughcolor=t["card_sfondo"],
             bordercolor=t["card_bordo"],
@@ -355,15 +355,15 @@ class SimulatoreAgricolturaGUI:
         )
 
     def _build_tab_region(self):
-        self.notebook_outer = tk.Frame(self.inner_frame, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        self.notebook_outer = tk.Frame(self.inner_frame, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         self.notebook_outer.pack(fill="both", expand=True, padx=10, pady=(2, 6))
-        self.nb = ttk.Notebook(self.notebook_outer, style="Officina.TNotebook")
+        self.nb = ttk.Notebook(self.notebook_outer, style="Terra_Verde.TNotebook")
         self.nb.pack(fill="both", expand=True)
 
-        f_cfg = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
-        f_prod = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
-        f_sim = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
-        f_rep = tk.Frame(self.nb, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        f_cfg = tk.Frame(self.nb, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
+        f_prod = tk.Frame(self.nb, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
+        f_sim = tk.Frame(self.nb, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
+        f_rep = tk.Frame(self.nb, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         self.nb.add(f_cfg, text="  ⚙  CONFIGURAZIONE  ")
         self.nb.add(f_prod, text="  🌱  PRODOTTI & QUANTITA  ")
         self.nb.add(f_sim, text="  ▶  SIMULAZIONE  ")
@@ -376,9 +376,9 @@ class SimulatoreAgricolturaGUI:
 
     # --------------- Tab 1: Configurazione ---------------
     def _tab_configurazione(self, root_frm: tk.Frame):
-        sx = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        sx = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         sx.pack(side="left", fill="both", expand=True, padx=(6, 8), pady=10)
-        dx = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        dx = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         dx.pack(side="right", fill="both", expand=True, padx=(8, 6), pady=10)
 
         card_p = self._card(sx, "PARAMETRI DI PROCESSO", fill="both", expand=True, pady=(0, 8))
@@ -407,7 +407,7 @@ class SimulatoreAgricolturaGUI:
             self._input(griglia, var, width=22).grid(row=i, column=1, sticky="we", pady=5)
         griglia.columnconfigure(1, weight=1)
 
-        sep = tk.Frame(card_p, height=2, bg=TEMI_OFFICINA[self.tema_corrente]["separatore"])
+        sep = tk.Frame(card_p, height=2, bg=TEMI_TERRA_VERDE[self.tema_corrente]["separatore"])
         sep.pack(fill="x", padx=14)
         self._bottone_verde(card_p, "✅  APPLICA CONFIGURAZIONE", self._applica_config).pack(fill="x", padx=14, pady=12)
 
@@ -437,7 +437,7 @@ class SimulatoreAgricolturaGUI:
             kpi_body.columnconfigure(1, weight=1)
             self.mappa_kpi[k] = v
 
-        sep2 = tk.Frame(dx, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"], height=8)
+        sep2 = tk.Frame(dx, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"], height=8)
         sep2.pack(fill="x")
         card_note = self._card(dx, "INFORMAZIONI DI SISTEMA", fill="x", expand=False, pady=(8, 0))
         nt = tk.Label(
@@ -445,8 +445,8 @@ class SimulatoreAgricolturaGUI:
             text="  Suggerimento: con 3 prodotti l'ottimizzazione sequenza\n"
                  "  calcola in modo esaustivo 6 permutazioni per minimizzare\n"
                  "  il makespan (tempo totale sequenziale) del lotto.",
-            bg=TEMI_OFFICINA[self.tema_corrente]["note_sfondo"],
-            fg=TEMI_OFFICINA[self.tema_corrente]["note_testo"],
+            bg=TEMI_TERRA_VERDE[self.tema_corrente]["note_sfondo"],
+            fg=TEMI_TERRA_VERDE[self.tema_corrente]["note_testo"],
             font=("Tahoma", 9),
             anchor="w",
             justify="left",
@@ -454,16 +454,16 @@ class SimulatoreAgricolturaGUI:
             relief="solid",
             bd=1,
             highlightthickness=1,
-            highlightbackground=TEMI_OFFICINA[self.tema_corrente]["cornice_soft"],
+            highlightbackground=TEMI_TERRA_VERDE[self.tema_corrente]["cornice_soft"],
         )
         nt.pack(fill="x", padx=12, pady=12)
         self.lista_note.append(nt)
 
     # --------------- Tab 2: Prodotti ---------------
     def _tab_prodotti(self, root_frm: tk.Frame):
-        alto = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        alto = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         alto.pack(fill="x", padx=10, pady=(10, 4))
-        basso = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        basso = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         basso.pack(fill="both", expand=True, padx=10, pady=(4, 10))
 
         card_tab = self._card(basso, "TABELLA PRODOTTI  —  doppio click per modificare", fill="both", expand=True)
@@ -472,7 +472,7 @@ class SimulatoreAgricolturaGUI:
 
         cols = ("id", "nome", "um", "t_unita_h", "cap_gg", "t_prep", "t_lav", "resa_pct",
                 "t_sigma", "resa_sigma", "c_mano_ora", "c_mac_ora", "prezzo_um", "qta")
-        self.tab = ttk.Treeview(body_tab, columns=cols, show="headings", style="Officina.Treeview", height=11)
+        self.tab = ttk.Treeview(body_tab, columns=cols, show="headings", style="Terra_Verde.Treeview", height=11)
         self.lista_tree.append(self.tab)
         head = [
             ("id", "ID", 60), ("nome", "Prodotto", 185), ("um", "U.M.", 55),
@@ -486,7 +486,7 @@ class SimulatoreAgricolturaGUI:
             self.tab.heading(c, text=tx)
             self.tab.column(c, width=w, anchor="center")
         self.tab.pack(side="left", fill="both", expand=True)
-        scr = ttk.Scrollbar(body_tab, orient="vertical", command=self.tab.yview, style="Officina.Vertical.TScrollbar")
+        scr = ttk.Scrollbar(body_tab, orient="vertical", command=self.tab.yview, style="Terra_Verde.Vertical.TScrollbar")
         scr.pack(side="right", fill="y")
         self.tab.configure(yscrollcommand=scr.set)
         self.tab.bind("<Double-1>", lambda _e: self._modifica())
@@ -502,9 +502,9 @@ class SimulatoreAgricolturaGUI:
 
     # --------------- Tab 3: Simulazione ---------------
     def _tab_simulazione(self, root_frm: tk.Frame):
-        sx_f = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        sx_f = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         sx_f.pack(side="left", fill="y", expand=False, padx=(10, 8), pady=10)
-        dx_f = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        dx_f = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         dx_f.pack(side="right", fill="both", expand=True, padx=(8, 10), pady=10)
 
         sx_card = self._card(sx_f, "PANNELLO ESECUZIONE", fill="both", expand=True, pady=(0, 8))
@@ -515,7 +515,7 @@ class SimulatoreAgricolturaGUI:
         self.v_it = tk.IntVar(value=500)
         self.v_seed_run = tk.StringVar(value="7")
 
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         mc_check = tk.Checkbutton(
             body,
             text="  ☑  ABILITA MONTE CARLO (stocasticità)",
@@ -550,8 +550,8 @@ class SimulatoreAgricolturaGUI:
             text="  • MC 500 iterazioni = ~1-2 secondi\n"
                  "  • MC disabilitato = calcolo deterministico\n"
                  "  • Sequenza lotti ottimizzata (esaustiva ≤ 8 prod.)",
-            bg=TEMI_OFFICINA[self.tema_corrente]["note_sfondo"],
-            fg=TEMI_OFFICINA[self.tema_corrente]["note_testo"],
+            bg=TEMI_TERRA_VERDE[self.tema_corrente]["note_sfondo"],
+            fg=TEMI_TERRA_VERDE[self.tema_corrente]["note_testo"],
             font=("Tahoma", 9),
             anchor="w",
             justify="left",
@@ -569,19 +569,19 @@ class SimulatoreAgricolturaGUI:
         self.txt_out = tk.Text(
             dx_body, wrap="none", font=FONT_CALCOLO,
             padx=12, pady=10, height=10, bd=0, relief="flat",
-            highlightthickness=2, highlightbackground=TEMI_OFFICINA[self.tema_corrente]["cornice_soft"],
+            highlightthickness=2, highlightbackground=TEMI_TERRA_VERDE[self.tema_corrente]["cornice_soft"],
         )
         self.lista_text.append(self.txt_out)
         self.txt_out.pack(side="left", fill="both", expand=True)
-        scr2 = ttk.Scrollbar(dx_body, orient="vertical", command=self.txt_out.yview, style="Officina.Vertical.TScrollbar")
+        scr2 = ttk.Scrollbar(dx_body, orient="vertical", command=self.txt_out.yview, style="Terra_Verde.Vertical.TScrollbar")
         scr2.pack(side="right", fill="y")
         self.txt_out.configure(yscrollcommand=scr2.set)
 
     # --------------- Tab 4: Report ---------------
     def _tab_report(self, root_frm: tk.Frame):
-        alto = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        alto = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         alto.pack(fill="both", expand=True, padx=10, pady=(10, 4))
-        basso = tk.Frame(root_frm, bg=TEMI_OFFICINA[self.tema_corrente]["sfondo_applicativo"])
+        basso = tk.Frame(root_frm, bg=TEMI_TERRA_VERDE[self.tema_corrente]["sfondo_applicativo"])
         basso.pack(fill="x", expand=False, padx=10, pady=(4, 10))
 
         card_rep = self._card(alto, "TABELLA DETTAGLIO LOTTI", fill="both", expand=True)
@@ -590,7 +590,7 @@ class SimulatoreAgricolturaGUI:
 
         cols = ("lotto", "id", "qta_in", "t_prep_h", "t_racc_h", "t_lav_h", "t_guasti_h",
                 "t_tot_h", "t_tot_g", "resa_eff", "out_f", "costo_tot", "ricavo", "profitto")
-        self.tab_report = ttk.Treeview(body_rep, columns=cols, show="headings", style="Officina.Treeview", height=14)
+        self.tab_report = ttk.Treeview(body_rep, columns=cols, show="headings", style="Terra_Verde.Treeview", height=14)
         self.lista_tree.append(self.tab_report)
         h = [
             ("lotto", "Lotto", 58), ("id", "ID", 92), ("qta_in", "Qta in", 80),
@@ -603,7 +603,7 @@ class SimulatoreAgricolturaGUI:
             self.tab_report.heading(c, text=tx)
             self.tab_report.column(c, width=w, anchor="center")
         self.tab_report.pack(side="left", fill="both", expand=True)
-        scr3 = ttk.Scrollbar(body_rep, orient="vertical", command=self.tab_report.yview, style="Officina.Vertical.TScrollbar")
+        scr3 = ttk.Scrollbar(body_rep, orient="vertical", command=self.tab_report.yview, style="Terra_Verde.Vertical.TScrollbar")
         scr3.pack(side="right", fill="y")
         self.tab_report.configure(yscrollcommand=scr3.set)
 
@@ -613,14 +613,14 @@ class SimulatoreAgricolturaGUI:
         self.txt_gantt = tk.Text(
             body_g, height=7, wrap="none", font=FONT_CALCOLO,
             padx=12, pady=10, bd=0, relief="flat",
-            highlightthickness=2, highlightbackground=TEMI_OFFICINA[self.tema_corrente]["cornice_soft"],
+            highlightthickness=2, highlightbackground=TEMI_TERRA_VERDE[self.tema_corrente]["cornice_soft"],
         )
         self.lista_text.append(self.txt_gantt)
         self.txt_gantt.pack(fill="x", expand=False)
 
     # --------------- Status bar ---------------
     def _build_status(self):
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         wrap = tk.Frame(self.inner_frame, bg=t["cornice_soft"], bd=0, highlightthickness=1, highlightbackground=t["cornice_soft"])
         wrap.pack(fill="x", side="bottom", padx=10, pady=(2, 10))
         self.status_frame = tk.Frame(wrap, bg=t["status_sfondo"], bd=0)
@@ -636,7 +636,7 @@ class SimulatoreAgricolturaGUI:
 
     # ---------------------- Tema applicazione runtime ----------------------
     def applica_tema(self, nome_tema: str):
-        t = TEMI_OFFICINA[nome_tema]
+        t = TEMI_TERRA_VERDE[nome_tema]
         self.tema_corrente = nome_tema
 
         if self.outer_frame is not None:
@@ -654,15 +654,15 @@ class SimulatoreAgricolturaGUI:
                 except Exception:
                     pass
 
-        for lab in self.lista_label_officina:
+        for lab in self.lista_label_terra_verde:
             lab.configure(bg=t["label_sfondo"], fg=t["label_testo"])
-        for v in self.lista_valore_officina:
+        for v in self.lista_valore_terra_verde:
             v.configure(
                 bg=t["valore_sfondo"], fg=t["valore_testo"],
                 highlightbackground=t["valore_bordo"],
                 highlightcolor=t["valore_bordo"],
             )
-        for entry in self.lista_input_officina:
+        for entry in self.lista_input_terra_verde:
             entry.configure(
                 bg=t["input_sfondo"], fg=t["input_testo"],
                 insertbackground=t["input_testo"],
@@ -671,7 +671,7 @@ class SimulatoreAgricolturaGUI:
                 highlightbackground=t["input_bordo"],
                 highlightcolor=t["input_bordo"],
             )
-        verde_ref = TEMI_OFFICINA["classico"]["verde_primario"]
+        verde_ref = TEMI_TERRA_VERDE["classico"]["verde_primario"]
         for btn in self.lista_bottoni:
             is_verde = False
             try:
@@ -728,18 +728,18 @@ class SimulatoreAgricolturaGUI:
         try:
             s = ttk.Style()
             s.configure(
-                "Officina.Treeview",
+                "Terra_Verde.Treeview",
                 background=t["tree_sfondo"],
                 foreground=t["tree_testo"],
                 fieldbackground=t["tree_sfondo"],
             )
             s.configure(
-                "Officina.Treeview.Heading",
+                "Terra_verde.Treeview.Heading",
                 background=t["tree_head_sfondo"],
                 foreground=t["tree_head_testo"],
             )
             s.map(
-                "Officina.Treeview",
+                "Terra_Verde.Treeview",
                 background=[("selected", t["tree_sel_sfondo"])],
                 foreground=[("selected", t["tree_sel_testo"])],
             )
@@ -770,7 +770,7 @@ class SimulatoreAgricolturaGUI:
     def _popola_tabella(self):
         for iid in self.tab.get_children():
             self.tab.delete(iid)
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         for i, (key, p) in enumerate(self.cfg.prodotti_configurati.items()):
             tag = "even" if i % 2 == 0 else "odd"
             self.tab.insert("", "end", iid=key, tags=(tag,), values=(
@@ -856,7 +856,7 @@ class SimulatoreAgricolturaGUI:
         key = sel[0]
         p = self.cfg.prodotti_configurati[key]
         vals = list(self.tab.item(key, "values"))
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
 
         win = tk.Toplevel(self.root)
         win.title(f"MODIFICA — {p.nome}")
@@ -1000,7 +1000,7 @@ class SimulatoreAgricolturaGUI:
             "margine_pct": f"{mpct:.2f} %",
             "ordine": "   →   ".join(r.ordine_lotti_ottimale or []),
         }
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         colori = {
             "regime": t["blu_kpi"], "t_seq_g": t["blu_kpi"], "t_par_g": t["blu_kpi"], "ordine": t["blu_kpi"],
             "speedup": t["verde_kpi"], "ricavo": t["verde_kpi"], "margine_pct": t["verde_kpi"],
@@ -1020,7 +1020,7 @@ class SimulatoreAgricolturaGUI:
     def _aggiorna_report(self, r: ReportSimulazione):
         for iid in self.tab_report.get_children():
             self.tab_report.delete(iid)
-        t = TEMI_OFFICINA[self.tema_corrente]
+        t = TEMI_TERRA_VERDE[self.tema_corrente]
         for idx, l in enumerate(r.lotti, 1):
             tag = "even" if idx % 2 == 0 else "odd"
             self.tab_report.insert("", "end", tags=(tag,), values=(
