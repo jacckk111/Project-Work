@@ -1,0 +1,582 @@
+import random
+import json
+import math
+import itertools
+from dataclasses import dataclass, field, asdict
+from typing import Dict, List, Optional, Tuple, Callable
+
+
+@dataclass
+class Distribuzione:
+    valore_medio: float
+    deviazione_standard: float = 0.0
+    minimo: Optional[float] = None
+    massimo: Optional[float] = None
+
+    def campiona(self, rng: random.Random) -> float:
+        if self.deviazione_standard <= 0:
+            v = self.valore_medio
+        else:
+            v = rng.gauss(self.valore_medio, self.deviazione_standard)
+        if self.minimo is not None:
+            v = max(v, self.minimo)
+        if self.massimo is not None:
+            v = min(v, self.massimo)
+        return v
+
+
+@dataclass
+class Prodotto:
+    nome: str
+    unita_misura: str
+    tempo_per_unita_ore: float
+    capacita_giornaliera: int
+    fase_preparazione_ore: float = 0.0
+    fase_lavorazione_ore: float = 0.0
+    resa_percentuale: float = 100.0
+    tempo_unita_sigma: float = 0.0
+    resa_sigma: float = 0.0
+    costo_manodopera_ora: float = 25.0
+    costo_macchinari_ora: float = 40.0
+    prezzo_vendita_per_unita_output: float = 0.0
+
+
+@dataclass
+class ConfigurazioneProcesso:
+    orario_lavoro_giornaliero_ore: float = 8.0
+    giorni_lavorativi_settimana: int = 6
+    capacita_giornaliera_complessiva_unita: Optional[int] = None
+    margine_temporale_percentuale: float = 10.0
+    prodotti_configurati: Dict[str, Prodotto] = field(default_factory=dict)
+    tasso_guasti_giornaliero: float = 0.03
+    costo_fisso_giornaliero: float = 350.0
+    numero_operatori: int = 6
+
+
+@dataclass
+class RisultatoLotto:
+    id_prodotto: str
+    prodotto: Prodotto
+    quantita_input: int
+    tempo_preparazione_ore: float
+    tempo_raccolta_ore: float
+    tempo_lavorazione_ore: float
+    tempo_totale_ore: float
+    tempo_totale_giorni_lavorativi: float
+    output_finale_unita: int
+    resa_effettiva_percentuale: float
+    costo_manodopera: float
+    costo_macchinari: float
+    costo_fissi_allocati: float
+    costo_totale: float
+    ricavo_atteso: float
+    profitto_atteso: float
+    costo_per_unita_output: float
+    tempo_guasti_ore: float = 0.0
+    inizio_giorno_relativo: int = 0
+    fine_giorno_relativo: float = 0.0
+
+
+@dataclass
+class ReportSimulazione:
+    lotti: List[RisultatoLotto]
+    configurazione: ConfigurazioneProcesso
+    regime: str
+    tempo_totale_ore_sequenziale: float
+    tempo_totale_giorni_sequenziale: float
+    tempo_totale_ore_parallelo: float
+    tempo_totale_giorni_parallelo: float
+    costo_complessivo: float
+    ricavo_complessivo: float
+    profitto_complessivo: float
+    monte_carlo_iterazioni: Optional[int] = None
+    mc_percentili: Optional[Dict[str, Dict[float, float]]] = None
+    ordine_lotti_ottimale: Optional[List[str]] = None
+
+
+def configurazione_default() -> ConfigurazioneProcesso:
+    cfg = ConfigurazioneProcesso()
+    cfg.orario_lavoro_giornaliero_ore = 8.0
+    cfg.giorni_lavorativi_settimana = 6
+    cfg.capacita_giornaliera_complessiva_unita = 5000
+    cfg.margine_temporale_percentuale = 10.0
+    cfg.tasso_guasti_giornaliero = 0.03
+    cfg.costo_fisso_giornaliero = 350.0
+    cfg.numero_operatori = 6
+
+    cfg.prodotti_configurati["pomodori"] = Prodotto(
+        nome="Pomodori biologici",
+        unita_misura="kg",
+        tempo_per_unita_ore=0.005,
+        capacita_giornaliera=2000,
+        fase_preparazione_ore=3.0,
+        fase_lavorazione_ore=5.0,
+        resa_percentuale=92.0,
+        tempo_unita_sigma=0.0008,
+        resa_sigma=3.0,
+        costo_manodopera_ora=28.0,
+        costo_macchinari_ora=35.0,
+        prezzo_vendita_per_unita_output=3.20,
+    )
+
+    cfg.prodotti_configurati["grano"] = Prodotto(
+        nome="Grano tenero biologico",
+        unita_misura="quintali",
+        tempo_per_unita_ore=0.08,
+        capacita_giornaliera=150,
+        fase_preparazione_ore=8.0,
+        fase_lavorazione_ore=12.0,
+        resa_percentuale=85.0,
+        tempo_unita_sigma=0.01,
+        resa_sigma=5.0,
+        costo_manodopera_ora=22.0,
+        costo_macchinari_ora=60.0,
+        prezzo_vendita_per_unita_output=48.0,
+    )
+
+    cfg.prodotti_configurati["oliva"] = Prodotto(
+        nome="Olive da olio biologiche",
+        unita_misura="kg",
+        tempo_per_unita_ore=0.01,
+        capacita_giornaliera=1200,
+        fase_preparazione_ore=6.0,
+        fase_lavorazione_ore=24.0,
+        resa_percentuale=18.0,
+        tempo_unita_sigma=0.002,
+        resa_sigma=2.5,
+        costo_manodopera_ora=30.0,
+        costo_macchinari_ora=75.0,
+        prezzo_vendita_per_unita_output=12.50,
+    )
+
+    return cfg
+
+
+def genera_quantita_casuali(cfg: ConfigurazioneProcesso, seed: Optional[int] = None) -> Dict[str, int]:
+    rng = random.Random(seed)
+    quantita: Dict[str, int] = {}
+    for key, prod in cfg.prodotti_configurati.items():
+        min_q = int(prod.capacita_giornaliera * 1.5)
+        max_q = int(prod.capacita_giornaliera * 5.0)
+        quantita[key] = rng.randint(min_q, max_q)
+    return quantita
+
+
+def imposta_tempo_per_unita(cfg: ConfigurazioneProcesso, id_prodotto: str, tempo_ore: float) -> None:
+    if id_prodotto not in cfg.prodotti_configurati:
+        raise KeyError(f"Prodotto {id_prodotto} non trovato")
+    if tempo_ore <= 0:
+        raise ValueError("Il tempo per unità deve essere positivo")
+    cfg.prodotti_configurati[id_prodotto].tempo_per_unita_ore = tempo_ore
+
+
+def imposta_capacita_giornaliera_prodotto(cfg: ConfigurazioneProcesso, id_prodotto: str, capacita: int) -> None:
+    if id_prodotto not in cfg.prodotti_configurati:
+        raise KeyError(f"Prodotto {id_prodotto} non trovato")
+    if capacita <= 0:
+        raise ValueError("La capacità giornaliera deve essere positiva")
+    cfg.prodotti_configurati[id_prodotto].capacita_giornaliera = capacita
+
+
+def imposta_capacita_complessiva(cfg: ConfigurazioneProcesso, capacita: Optional[int]) -> None:
+    if capacita is not None and capacita <= 0:
+        raise ValueError("La capacità complessiva deve essere positiva o None")
+    cfg.capacita_giornaliera_complessiva_unita = capacita
+
+
+def imposta_orario_lavoro(cfg: ConfigurazioneProcesso, ore_giornaliere: float, giorni_settimana: int) -> None:
+    if ore_giornaliere <= 0 or ore_giornaliere > 24:
+        raise ValueError("Orario giornaliero non valido")
+    if giorni_settimana < 1 or giorni_settimana > 7:
+        raise ValueError("Giorni settimanali non validi")
+    cfg.orario_lavoro_giornaliero_ore = ore_giornaliere
+    cfg.giorni_lavorativi_settimana = giorni_settimana
+
+
+def imposta_margine_temporale(cfg: ConfigurazioneProcesso, percentuale: float) -> None:
+    if percentuale < 0:
+        raise ValueError("Il margine non può essere negativo")
+    cfg.margine_temporale_percentuale = percentuale
+
+
+def _simula_un_lotto(
+    cfg: ConfigurazioneProcesso,
+    id_prodotto: str,
+    qta: int,
+    rng: random.Random,
+) -> RisultatoLotto:
+    prod = cfg.prodotti_configurati[id_prodotto]
+
+    dist_t_unita = Distribuzione(
+        valore_medio=prod.tempo_per_unita_ore,
+        deviazione_standard=prod.tempo_unita_sigma,
+        minimo=prod.tempo_per_unita_ore * 0.5,
+    )
+    tempo_unitario_campionato = dist_t_unita.campiona(rng)
+
+    dist_resa = Distribuzione(
+        valore_medio=prod.resa_percentuale,
+        deviazione_standard=prod.resa_sigma,
+        minimo=max(prod.resa_percentuale * 0.6, 1.0),
+        massimo=min(prod.resa_percentuale * 1.1, 100.0),
+    )
+    resa_eff = dist_resa.campiona(rng)
+
+    t_raccolta = qta * tempo_unitario_campionato
+    giorni_raccolta = t_raccolta / cfg.orario_lavoro_giornaliero_ore
+    if prod.capacita_giornaliera > 0:
+        giorni_capacita = qta / prod.capacita_giornaliera
+        giorni_raccolta = max(giorni_raccolta, giorni_capacita)
+    t_raccolta_eff = giorni_raccolta * cfg.orario_lavoro_giornaliero_ore
+
+    t_prep = prod.fase_preparazione_ore
+    t_lav = prod.fase_lavorazione_ore
+    t_tot_raw = t_raccolta_eff + t_prep + t_lav
+    t_tot_margine = t_tot_raw * (1 + cfg.margine_temporale_percentuale / 100)
+
+    n_giorni_totali = math.ceil(t_tot_margine / cfg.orario_lavoro_giornaliero_ore)
+    t_guasti = 0.0
+    for _ in range(max(1, n_giorni_totali)):
+        if rng.random() < cfg.tasso_guasti_giornaliero:
+            t_guasti += rng.uniform(0.5, 3.0)
+    t_tot_finale = t_tot_margine + t_guasti
+    g_tot = t_tot_finale / cfg.orario_lavoro_giornaliero_ore
+
+    output_finale = int(qta * (resa_eff / 100.0))
+    output_finale = max(0, output_finale)
+
+    costo_manodopera = (t_prep + t_raccolta_eff + t_lav) * prod.costo_manodopera_ora
+    costo_macchinari = (t_prep + t_raccolta_eff + t_lav) * prod.costo_macchinari_ora
+    costo_fissi = max(1.0, g_tot) * cfg.costo_fisso_giornaliero
+    costo_tot = costo_manodopera + costo_macchinari + costo_fissi
+
+    ricavo = output_finale * prod.prezzo_vendita_per_unita_output
+    profitto = ricavo - costo_tot
+    costo_per_unita = (costo_tot / output_finale) if output_finale > 0 else float("inf")
+
+    return RisultatoLotto(
+        id_prodotto=id_prodotto,
+        prodotto=prod,
+        quantita_input=qta,
+        tempo_preparazione_ore=round(t_prep, 2),
+        tempo_raccolta_ore=round(t_raccolta_eff, 2),
+        tempo_lavorazione_ore=round(t_lav, 2),
+        tempo_totale_ore=round(t_tot_finale, 2),
+        tempo_totale_giorni_lavorativi=round(g_tot, 2),
+        output_finale_unita=output_finale,
+        resa_effettiva_percentuale=round(resa_eff, 2),
+        costo_manodopera=round(costo_manodopera, 2),
+        costo_macchinari=round(costo_macchinari, 2),
+        costo_fissi_allocati=round(costo_fissi, 2),
+        costo_totale=round(costo_tot, 2),
+        ricavo_atteso=round(ricavo, 2),
+        profitto_atteso=round(profitto, 2),
+        costo_per_unita_output=round(costo_per_unita, 4),
+        tempo_guasti_ore=round(t_guasti, 2),
+    )
+
+
+def calcola_tempo_produzione(cfg: ConfigurazioneProcesso, quantita: Dict[str, int], seed: Optional[int] = None) -> List[RisultatoLotto]:
+    rng = random.Random(seed)
+    return [_simula_un_lotto(cfg, k, q, rng) for k, q in quantita.items() if k in cfg.prodotti_configurati]
+
+
+def ottimizza_ordine_lotti(cfg: ConfigurazioneProcesso, quantita: Dict[str, int], seed: Optional[int] = None) -> Tuple[List[str], Dict[str, float]]:
+    keys = [k for k in quantita if k in cfg.prodotti_configurati]
+    if len(keys) > 8:
+        baseline = calcola_tempo_produzione(cfg, quantita, seed)
+        ordine = sorted(baseline, key=lambda l: l.tempo_totale_giorni_lavorativi, reverse=True)
+        return [l.id_prodotto for l in ordine], {}
+
+    miglior_ordine = None
+    miglior_makespan = float("inf")
+    valutazioni = {}
+
+    for perm in itertools.permutations(keys):
+        qta_ordinate = {k: quantita[k] for k in perm}
+        lotti_seq = calcola_tempo_produzione(cfg, qta_ordinate, seed)
+        makespan_seq = sum(l.tempo_totale_giorni_lavorativi for l in lotti_seq)
+        valutazioni[" > ".join(perm)] = round(makespan_seq, 2)
+        if makespan_seq < miglior_makespan:
+            miglior_makespan = makespan_seq
+            miglior_ordine = list(perm)
+
+    return list(miglior_ordine or keys), valutazioni
+
+
+def _calcola_tempi_scheduling(lotti: List[RisultatoLotto], cfg: ConfigurazioneProcesso, ordine: Optional[List[str]] = None) -> Tuple[float, float]:
+    if ordine is None:
+        ordine = [l.id_prodotto for l in lotti]
+    mappa = {l.id_prodotto: l for l in lotti}
+
+    tempo_sequenziale_giorni = sum(mappa[k].tempo_totale_giorni_lavorativi for k in ordine)
+    tempo_sequenziale_ore = tempo_sequenziale_giorni * cfg.orario_lavoro_giornaliero_ore
+
+    tempo_corrente_giorni = 0.0
+    for k in ordine:
+        l = mappa[k]
+        l.inizio_giorno_relativo = round(tempo_corrente_giorni, 2)
+        tempo_corrente_giorni += l.tempo_totale_giorni_lavorativi
+        l.fine_giorno_relativo = round(tempo_corrente_giorni, 2)
+
+    return round(tempo_sequenziale_ore, 2), round(tempo_sequenziale_giorni, 2)
+
+
+def calcola_monte_carlo(
+    cfg: ConfigurazioneProcesso,
+    quantita: Dict[str, int],
+    iterazioni: int = 500,
+    seed: Optional[int] = None,
+    percentili: Tuple[float, ...] = (0.05, 0.25, 0.50, 0.75, 0.95),
+) -> Tuple[List[RisultatoLotto], Dict[str, Dict[float, float]]]:
+    rng = random.Random(seed)
+    baseline_seed = rng.randint(0, 2**31 - 1)
+    baseline = calcola_tempo_produzione(cfg, quantita, baseline_seed)
+
+    serie: Dict[str, Dict[str, List[float]]] = {}
+    for l in baseline:
+        serie[l.id_prodotto] = {"tempo_giorni": [], "profitto": [], "output": []}
+
+    for i in range(iterazioni):
+        lotti_i = calcola_tempo_produzione(cfg, quantita, rng.randint(0, 2**31 - 1))
+        for l in lotti_i:
+            serie[l.id_prodotto]["tempo_giorni"].append(l.tempo_totale_giorni_lavorativi)
+            serie[l.id_prodotto]["profitto"].append(l.profitto_atteso)
+            serie[l.id_prodotto]["output"].append(l.output_finale_unita)
+
+    def percentile_empirico(vals: List[float], p: float) -> float:
+        if not vals:
+            return 0.0
+        s = sorted(vals)
+        k = max(0, min(len(s) - 1, int(round(p * (len(s) - 1)))))
+        return round(s[k], 3)
+
+    mc_percentili: Dict[str, Dict[float, float]] = {}
+    for id_prodotto, d in serie.items():
+        mc_percentili[id_prodotto] = {}
+        for p in percentili:
+            mc_percentili[id_prodotto][("tempo_giorni_p" + str(int(p * 100)))] = percentile_empirico(d["tempo_giorni"], p)
+            mc_percentili[id_prodotto][("profitto_p" + str(int(p * 100)))] = percentile_empirico(d["profitto"], p)
+            mc_percentili[id_prodotto][("output_p" + str(int(p * 100)))] = percentile_empirico(d["output"], p)
+
+    return baseline, mc_percentili
+
+
+def simulazione_completa(
+    cfg: ConfigurazioneProcesso,
+    quantita: Dict[str, int],
+    seed: Optional[int] = None,
+    mc_iterazioni: int = 0,
+) -> ReportSimulazione:
+    rng = random.Random(seed)
+    ordine, _ = ottimizza_ordine_lotti(cfg, quantita, (rng.randint(0, 2**31 - 1) if seed is not None else None))
+
+    mc_percentili = None
+    if mc_iterazioni > 0:
+        mc_seed = rng.randint(0, 2**31 - 1) if seed is not None else None
+        lotti, mc_percentili = calcola_monte_carlo(cfg, quantita, mc_iterazioni, mc_seed)
+    else:
+        lotti = calcola_tempo_produzione(cfg, quantita, (rng.randint(0, 2**31 - 1) if seed is not None else None))
+
+    t_seq_ore, t_seq_giorni = _calcola_tempi_scheduling(lotti, cfg, ordine)
+
+    tempistiche_parallele = sorted([l.tempo_totale_giorni_lavorativi for l in lotti], reverse=True)
+    if cfg.numero_operatori >= len(lotti):
+        t_parallelo_giorni = max(tempistiche_parallele) if tempistiche_parallele else 0.0
+    else:
+        import heapq
+        heap = [0.0] * cfg.numero_operatori
+        for t in tempistiche_parallele:
+            prossimo = heapq.heappop(heap)
+            heapq.heappush(heap, prossimo + t)
+        t_parallelo_giorni = max(heap)
+    t_parallelo_ore = t_parallelo_giorni * cfg.orario_lavoro_giornaliero_ore
+
+    costo_tot = sum(l.costo_totale for l in lotti)
+    ricavo_tot = sum(l.ricavo_atteso for l in lotti)
+    profitto_tot = sum(l.profitto_atteso for l in lotti)
+
+    return ReportSimulazione(
+        lotti=lotti,
+        configurazione=cfg,
+        regime="deterministico" if mc_iterazioni == 0 else "monte_carlo",
+        tempo_totale_ore_sequenziale=round(t_seq_ore, 2),
+        tempo_totale_giorni_sequenziale=round(t_seq_giorni, 2),
+        tempo_totale_ore_parallelo=round(t_parallelo_ore, 2),
+        tempo_totale_giorni_parallelo=round(t_parallelo_giorni, 2),
+        costo_complessivo=round(costo_tot, 2),
+        ricavo_complessivo=round(ricavo_tot, 2),
+        profitto_complessivo=round(profitto_tot, 2),
+        monte_carlo_iterazioni=mc_iterazioni if mc_iterazioni > 0 else None,
+        mc_percentili=mc_percentili,
+        ordine_lotti_ottimale=ordine,
+    )
+
+
+def genera_report_produzione(report: ReportSimulazione) -> str:
+    cfg = report.configurazione
+    righe = []
+    righe.append("=" * 90)
+    righe.append("  REPORT SIMULAZIONE PROCESSO PRODUTTIVO — AZIENDA AGRICOLA TERRA VERDE")
+    righe.append("=" * 90)
+    righe.append(f"  Regime di calcolo: {report.regime.upper()}" + (f" ({report.monte_carlo_iterazioni} iterazioni MC)" if report.monte_carlo_iterazioni else ""))
+    righe.append(f"  Orario lavoro: {cfg.orario_lavoro_giornaliero_ore}h/giorno  •  {cfg.giorni_lavorativi_settimana} giorni/settimana")
+    righe.append(f"  Capacità complessiva/giorno: {cfg.capacita_giornaliera_complessiva_unita or 'Illimitata'} unità  •  Operatori: {cfg.numero_operatori}")
+    righe.append(f"  Margine: {cfg.margine_temporale_percentuale}%  •  Tasso guasti giornaliero: {cfg.tasso_guasti_giornaliero*100:.1f}%  •  Costi fissi: €{cfg.costo_fisso_giornaliero}/giorno")
+    if report.ordine_lotti_ottimale:
+        righe.append(f"  Sequenza ottimale lotti: {'  →  '.join(report.ordine_lotti_ottimale)}")
+    righe.append("-" * 90)
+
+    for idx, l in enumerate(report.lotti, 1):
+        p = l.prodotto
+        righe.append(f"  LOTTO {idx}: {p.nome}   (ID: {l.id_prodotto})")
+        righe.append(f"    Quantità input:       {l.quantita_input} {p.unita_misura}")
+        righe.append(f"    Fasi (h):             Preparazione {l.tempo_preparazione_ore}  •  Raccolta {l.tempo_raccolta_ore}  •  Lavorazione {l.tempo_lavorazione_ore}  •  Guasti {l.tempo_guasti_ore}")
+        righe.append(f"    TEMPO TOTALE:         {l.tempo_totale_ore}h  ({l.tempo_totale_giorni_lavorativi} giorni lavorativi)")
+        righe.append(f"    Resa effettiva:       {l.resa_effettiva_percentuale}%  →  Output finale: {l.output_finale_unita} {p.unita_misura}")
+        righe.append(f"    Costi (€):            Manodopera {l.costo_manodopera}  •  Macchinari {l.costo_macchinari}  •  Fissi allocati {l.costo_fissi_allocati}  →  TOTALE {l.costo_totale}")
+        if p.prezzo_vendita_per_unita_output > 0:
+            righe.append(f"    Ricavo/Profitto (€):  Ricavo {l.ricavo_atteso} @ €{p.prezzo_vendita_per_unita_output}/{p.unita_misura}  →  PROFITTO {l.profitto_atteso}  (€/u output: {l.costo_per_unita_output})")
+        if report.mc_percentili and l.id_prodotto in report.mc_percentili:
+            mc = report.mc_percentili[l.id_prodotto]
+            righe.append(f"    Monte Carlo percentili → Tempo giorni [P5={mc.get('tempo_giorni_p5', 'n/d')}, P50={mc.get('tempo_giorni_p50', 'n/d')}, P95={mc.get('tempo_giorni_p95', 'n/d')}]  Profitto € [P50={mc.get('profitto_p50', 'n/d')}, P95={mc.get('profitto_p95', 'n/d')}]")
+        righe.append(f"    Scheduling (giorni rel.):  inizio {l.inizio_giorno_relativo} → fine {l.fine_giorno_relativo}")
+        righe.append("-" * 90)
+
+    righe.append("=" * 90)
+    righe.append(f"  SCHEDULING SEQUENZIALE    → {report.tempo_totale_giorni_sequenziale} giorni  ({report.tempo_totale_ore_sequenziale}h)")
+    settimane_seq = report.tempo_totale_giorni_sequenziale / cfg.giorni_lavorativi_settimana
+    righe.append(f"                             ≈ {round(settimane_seq, 2)} settimane lavorative")
+    righe.append(f"  SCHEDULING PARALLELO ({cfg.numero_operatori} op.) → {report.tempo_totale_giorni_parallelo} giorni  ({report.tempo_totale_ore_parallelo}h)")
+    settimane_par = report.tempo_totale_giorni_parallelo / cfg.giorni_lavorativi_settimana
+    righe.append(f"                             ≈ {round(settimane_par, 2)} settimane lavorative")
+    if report.tempo_totale_giorni_sequenziale > 0:
+        speedup = report.tempo_totale_giorni_sequenziale / max(report.tempo_totale_giorni_parallelo, 0.001)
+        righe.append(f"  SPEEDUP parallelismo:      {round(speedup, 2)}x")
+    righe.append("-" * 90)
+    righe.append(f"  COSTO COMPLESSIVO:       € {report.costo_complessivo}")
+    righe.append(f"  RICAVO COMPLESSIVO:      € {report.ricavo_complessivo}")
+    margine_percentuale = (report.profitto_complessivo / report.ricavo_complessivo * 100) if report.ricavo_complessivo > 0 else 0
+    righe.append(f"  PROFITTO COMPLESSIVO:    € {report.profitto_complessivo}   (margine: {round(margine_percentuale, 2)}%)")
+    righe.append("=" * 90)
+
+    return "\n".join(righe)
+
+
+def salva_configurazione(cfg: ConfigurazioneProcesso, percorso: str) -> None:
+    out = {
+        "orario_lavoro_giornaliero_ore": cfg.orario_lavoro_giornaliero_ore,
+        "giorni_lavorativi_settimana": cfg.giorni_lavorativi_settimana,
+        "capacita_giornaliera_complessiva_unita": cfg.capacita_giornaliera_complessiva_unita,
+        "margine_temporale_percentuale": cfg.margine_temporale_percentuale,
+        "tasso_guasti_giornaliero": cfg.tasso_guasti_giornaliero,
+        "costo_fisso_giornaliero": cfg.costo_fisso_giornaliero,
+        "numero_operatori": cfg.numero_operatori,
+        "prodotti": {k: asdict(v) for k, v in cfg.prodotti_configurati.items()},
+    }
+    with open(percorso, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+
+
+def carica_configurazione(percorso: str) -> ConfigurazioneProcesso:
+    with open(percorso, "r", encoding="utf-8") as f:
+        dati = json.load(f)
+    cfg = ConfigurazioneProcesso()
+    cfg.orario_lavoro_giornaliero_ore = dati.get("orario_lavoro_giornaliero_ore", 8.0)
+    cfg.giorni_lavorativi_settimana = dati.get("giorni_lavorativi_settimana", 6)
+    cfg.capacita_giornaliera_complessiva_unita = dati.get("capacita_giornaliera_complessiva_unita")
+    cfg.margine_temporale_percentuale = dati.get("margine_temporale_percentuale", 10.0)
+    cfg.tasso_guasti_giornaliero = dati.get("tasso_guasti_giornaliero", 0.03)
+    cfg.costo_fisso_giornaliero = dati.get("costo_fisso_giornaliero", 350.0)
+    cfg.numero_operatori = dati.get("numero_operatori", 6)
+    cfg.prodotti_configurati = {}
+    for k, v in dati.get("prodotti", {}).items():
+        cfg.prodotti_configurati[k] = Prodotto(**v)
+    return cfg
+
+
+def esporta_report_json(report: ReportSimulazione, percorso: str) -> None:
+    cfg = report.configurazione
+    out = {
+        "regime": report.regime,
+        "monte_carlo_iterazioni": report.monte_carlo_iterazioni,
+        "configurazione": {
+            "orario_giornaliero_ore": cfg.orario_lavoro_giornaliero_ore,
+            "giorni_lavorativi_settimana": cfg.giorni_lavorativi_settimana,
+            "capacita_complessiva_unita": cfg.capacita_giornaliera_complessiva_unita,
+            "margine_temporale_percentuale": cfg.margine_temporale_percentuale,
+            "tasso_guasti_giornaliero": cfg.tasso_guasti_giornaliero,
+            "costo_fisso_giornaliero": cfg.costo_fisso_giornaliero,
+            "numero_operatori": cfg.numero_operatori,
+        },
+        "ordine_ottimale_lotti": report.ordine_lotti_ottimale,
+        "scheduling": {
+            "sequenziale": {
+                "ore": report.tempo_totale_ore_sequenziale,
+                "giorni_lavorativi": report.tempo_totale_giorni_sequenziale,
+                "settimane_lavorative": round(report.tempo_totale_giorni_sequenziale / cfg.giorni_lavorativi_settimana, 3),
+            },
+            "parallelo": {
+                "ore": report.tempo_totale_ore_parallelo,
+                "giorni_lavorativi": report.tempo_totale_giorni_parallelo,
+                "settimane_lavorative": round(report.tempo_totale_giorni_parallelo / cfg.giorni_lavorativi_settimana, 3),
+            },
+        },
+        "economia": {
+            "costo_complessivo_euro": report.costo_complessivo,
+            "ricavo_complessivo_euro": report.ricavo_complessivo,
+            "profitto_complessivo_euro": report.profitto_complessivo,
+            "margine_percentuale": round((report.profitto_complessivo / report.ricavo_complessivo * 100) if report.ricavo_complessivo else 0, 3),
+        },
+        "lotti": [],
+        "monte_carlo_percentili": report.mc_percentili,
+    }
+    for l in report.lotti:
+        p = l.prodotto
+        out["lotti"].append({
+            "id_prodotto": l.id_prodotto,
+            "prodotto": p.nome,
+            "unita_misura": p.unita_misura,
+            "quantita_input": l.quantita_input,
+            "tempo_preparazione_ore": l.tempo_preparazione_ore,
+            "tempo_raccolta_ore": l.tempo_raccolta_ore,
+            "tempo_lavorazione_ore": l.tempo_lavorazione_ore,
+            "tempo_guasti_ore": l.tempo_guasti_ore,
+            "tempo_totale_ore": l.tempo_totale_ore,
+            "tempo_totale_giorni_lavorativi": l.tempo_totale_giorni_lavorativi,
+            "resa_effettiva_percentuale": l.resa_effettiva_percentuale,
+            "output_finale_unita": l.output_finale_unita,
+            "costo_manodopera_euro": l.costo_manodopera,
+            "costo_macchinari_euro": l.costo_macchinari,
+            "costo_fissi_allocati_euro": l.costo_fissi_allocati,
+            "costo_totale_euro": l.costo_totale,
+            "ricavo_atteso_euro": l.ricavo_atteso,
+            "profitto_atteso_euro": l.profitto_atteso,
+            "costo_per_unita_output_euro": l.costo_per_unita_output,
+            "scheduling": {
+                "inizio_giorno_relativo": l.inizio_giorno_relativo,
+                "fine_giorno_relativo": l.fine_giorno_relativo,
+            },
+        })
+
+    with open(percorso, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+
+
+def main():
+    cfg = configurazione_default()
+    quantita = genera_quantita_casuali(cfg, seed=42)
+
+    report = simulazione_completa(cfg, quantita, seed=7, mc_iterazioni=200)
+    print(genera_report_produzione(report))
+
+    percorso_json = r"c:\Users\DANIEL\OneDrive\Desktop\PROGRAMMAZIONE\report_produzione.json"
+    esporta_report_json(report, percorso_json)
+    percorso_cfg = r"c:\Users\DANIEL\OneDrive\Desktop\PROGRAMMAZIONE\configurazione_agricola_default.json"
+    salva_configurazione(cfg, percorso_cfg)
+    print(f"\nReport JSON -> {percorso_json}")
+    print(f"Configurazione salvata -> {percorso_cfg}")
+
+
+if __name__ == "__main__":
+    main()
