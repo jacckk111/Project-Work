@@ -570,9 +570,9 @@ def main():
     report = simulazione_completa(cfg, quantita, seed=7, mc_iterazioni=200)
     print(genera_report_produzione(report))
 
-    percorso_json = r"c:\Users\DANIEL\OneDrive\Desktop\PROGRAMMAZIONE\report_produzione.json"
+    percorso_json = r"c:\Users\Desktop\report_produzione.json"
     esporta_report_json(report, percorso_json)
-    percorso_cfg = r"c:\Users\DANIEL\OneDrive\Desktop\PROGRAMMAZIONE\configurazione_agricola_default.json"
+    percorso_cfg = r"c:\Users\Desktop\\configurazione_agricola_default.json"
     salva_configurazione(cfg, percorso_cfg)
     print(f"\nReport JSON -> {percorso_json}")
     print(f"Configurazione salvata -> {percorso_cfg}")
